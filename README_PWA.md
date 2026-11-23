@@ -37,3 +37,10 @@ To access from a phone on the LAN, use an HTTPS-enabled deployment or secure tun
 Design an authenticated Supabase-backed API that validates officer roles and scheme IDs and returns per-event idempotent acknowledgements. Survey changes must enter review staging; only verified updates modify official institutional records and dashboards.
 
 Note: the icon in the PWA is a simple provisional NIMIS graphic, **not** an invented official Ministry crest. Replace it with the Ministry-provided approved assets before production.
+
+## Official branding (Zimbabwe coat of arms)
+- The uploaded Zimbabwe coat of arms is bundled as `public/zimbabwe-coat-of-arms.svg` (a compact embedded image of the supplied artwork).
+- The dashboard and install manifest use the coat of arms instead of the placeholder NIMIS icon.
+- Colors derive from its green shield, blue-and-white stripes, gold Zimbabwe bird and red star. Definitions: `src/official-theme.css`.
+- Primary green `#08643a`, blue `#2f3b83`, gold `#d4a73b`, red `#c84436`, off-white `#faf8f0`.
+- For full-resolution print collateral, use the original supplied source image rather than the optimized web asset.
