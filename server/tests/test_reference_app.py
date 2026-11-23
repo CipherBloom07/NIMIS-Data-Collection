@@ -98,7 +98,7 @@ def test_postgres_scope_uses_server_side_assignments(monkeypatch):
         "province_ids": ["DEMO-PROVINCE"], "district_ids": ["DEMO-DISTRICT"],
         "scheme_ids": ["DEMO-SCHEME-001"],
     })
-    monkeypatch.setattr(postgres_reference, "get_schemes", lambda user_id: [{
+    monkeypatch.setattr(postgres_reference, "get_schemes", lambda user_id, limit=100, after=None: [{
         "scheme_id": "DEMO-SCHEME-001", "name": "DB fictional scheme",
         "district_code": "DEMO-DISTRICT", "province_code": "DEMO-PROVINCE",
         "master_version": 2, "is_fictional": True,
