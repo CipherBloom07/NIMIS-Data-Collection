@@ -1,0 +1,61 @@
+"""Optional real PostgreSQL 16 integration checks.
+
+Only runs when NIMIS_TEST_POSTGRES_URL is set to a dedicated disposable database.
+Never supplies production credentials or attaches to a Ministry server.
+"""
+from pathlib import Path
+import os
+
+import pytest
+
+psycopg = pytest.importorskip("psycopg")
+
+def test_real_postgresql_reference_scope(monkeypatch):
+    url = os.getenv("NIMIS_TEST_POSTGRES_URL")
+    if not url:
+        pytest.skip("Isolated PostgreSQL CI connection not configured")
+
+    # Only a dedicated, explicitly named development database is allowed.
+    from urllib.parse import urlparse
+    dbname = urlparse(url).path.lstrip("/")
+    if dbname != "nimis_collect_dev":
+        pytest.fail("Refusing integration test against a non-development database")
+
+    sql = Path("server/postgres/001_dev_reference.sql").read_text(encoding="utf-8")
+    with psycopg.connect(url, autocommit=True) as conn:
+        for statement in sql.split(";"):
+            if statement.strip():
+                conn.execute(statement)
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM nimis_collect_demo.scheme WHERE is_fictional = true")
+            assert cur.fetchone()[0] == 1
+
+    monkeypatch.setenv("NIMIS_DEMO_MODE", "1")
+    monkeypatch.setenv("NIMIS_POSTGRES_DEMO_MODE", "1")
+    monkeypatch.setenv("NIMIS_COLLECT_DATABASE_URL", url)
+    from server.postgres_reference import get_actor, get_schemes
+    user_id = "10000000-0000-4000-8000-000000000001"
+    actor = get_actor(user_id)
+    assert actor is not None
+    assert actor["role"] == "field_officer"
+    assert actor["scheme_ids"] == ["DEMO-SCHEME-001"]
+    result = get_schemes(user_id)
+    assert len(result) == 1
+    assert result[0]["is_fictional"] is True
+    assert get_actor("10000000-0000-4000-8000-000000000099") is None
+    assert get_schemes("10000000-0000-4000-8000-000000000099") == []
+
+    # Revocation must immediately hide a previously visible assignment.
+    with psycopg.connect(url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE nimis_collect_demo.assignment
+                   SET revoked_at = now()
+                 WHERE officer_id = %s AND scheme_id = %s""",
+                (user_id, "DEMO-SCHEME-001"),
+            )
+            assert get_actor(user_id)["scheme_ids"] == ["DEMO-SCHEME-001"]  # uncommitted update is not visible
+        conn.commit()
+
+    assert get_actor(user_id)["scheme_ids"] == []
+    assert get_schemes(user_id) == []
