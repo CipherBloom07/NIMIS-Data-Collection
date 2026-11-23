@@ -1,0 +1,23 @@
+# NIMIS Collect isolated PostgreSQL development container.
+# Only fictional demo data; never attach a Ministry production database here.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nimis-collect-postgres-demo
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nimis_collect_dev
+      POSTGRES_USER: nimis_demo
+      POSTGRES_PASSWORD: ${NIMIS_PG_PASSWORD:?Set a random NIMIS_PG_PASSWORD in the local ignored environment file}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - nimis_collect_postgres_dev_data:/var/lib/postgresql/data
+      - ./001_dev_reference.sql:/opt/nimis/001_dev_reference.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nimis_demo -d nimis_collect_dev"]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+volumes:
+  nimis_collect_postgres_dev_data:
