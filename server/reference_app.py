@@ -16,6 +16,7 @@ import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from server import postgres_reference
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 FORM_CATALOGUE = APP_ROOT / "schemas" / "form-catalogue.v1.json"
@@ -78,7 +79,14 @@ def current_actor(authorization: Annotated[str | None, Header()] = None) -> Acto
         )
     except (jwt.PyJWTError, ValueError):
         raise HTTPException(status_code=401, detail="Invalid or expired access token") from None
-    actor = _actors().get(str(payload["sub"]))
+    try:
+        if postgres_reference.enabled():
+            database_actor = postgres_reference.get_actor(str(payload['sub']))
+            actor = Actor.model_validate(database_actor) if database_actor is not None else None
+        else:
+            actor = _actors().get(str(payload['sub']))
+    except postgres_reference.DatabaseUnavailable:
+        raise HTTPException(status_code=503, detail='Reference database unavailable') from None
     if actor is None:
         raise HTTPException(status_code=403, detail="User is not active or authorized")
     return actor
@@ -91,7 +99,8 @@ def _no_store(response: JSONResponse) -> JSONResponse:
 
 @app.get("/api/v1/health")
 def health():
-    return {"service": "nimis-collect-reference", "stage": "development", "status": "ok"}
+    return {"service": "nimis-collect-reference", "stage": "development", "status": "ok",
+            "reference_source": "postgresql_demo" if postgres_reference.enabled() else "in_memory_demo"}
 
 @app.post("/api/v1/dev/token", include_in_schema=False)
 def development_token(credentials: DemoTokenRequest, request: Request):
@@ -141,6 +150,13 @@ def forms(actor: ActorDep, since: str | None = None):
 
 @app.get("/api/v1/schemes")
 def schemes(actor: ActorDep, cursor: str | None = None):
+    if postgres_reference.enabled():
+        try:
+            # Only server-approved user assignments are used in database filtering.
+            items = postgres_reference.get_schemes(actor.user_id)
+        except postgres_reference.DatabaseUnavailable:
+            raise HTTPException(status_code=503, detail='Reference database unavailable') from None
+        return _no_store(JSONResponse({'items': items, 'next_cursor': None, 'has_more': False}))
     # Explicitly fictional record available ONLY for the assigned demo account.
     fixture = [{
         "scheme_id": DEMO_SCHEME_ID, "name": "Example Scheme (fictional)",
