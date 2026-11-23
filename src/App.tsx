@@ -4,6 +4,7 @@ import { allFields, sections, type SurveyField } from './survey';
 import { listDrafts, listOutbox, loadPhoto, saveDraft, savePhoto, type Draft, type SurveyAnswers, type Answer } from './storage';
 import './styles.css';
 import './official-theme.css';
+import './responsive.css';
 
 function getText(value: Answer | undefined): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
