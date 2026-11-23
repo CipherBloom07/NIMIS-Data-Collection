@@ -41,3 +41,24 @@ test('service worker excludes authenticated API routes from cache', () => {
   assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/);
   assert.match(sw, /Authorization/);
 });
+
+test('coat of arms is referenced by both desktop and mobile branding and bundled in the shell cache', () => {
+  const app = readFileSync('src/App.tsx', 'utf8');
+  const asset = readFileSync('public/zimbabwe-coat-of-arms.svg', 'utf8');
+  const sw = readFileSync('public/sw.js', 'utf8');
+  assert.match(app, /<GovernmentEmblem\/>/);
+  assert.match(app, /<GovernmentEmblem mobile\/>/);
+  assert.match(app, /zimbabwe-coat-of-arms\.svg/);
+  assert.match(asset, /data:image\/jpeg;base64,/);
+  assert.match(sw, /zimbabwe-coat-of-arms\.svg/);
+});
+
+test('baseline capture has validation and ordered autosave', () => {
+  const app = readFileSync('src/App.tsx', 'utf8');
+  const checks = readFileSync('src/validation.ts', 'utf8');
+  assert.match(app, /writeQueueRef/);
+  assert.match(app, /saveDraft\(currentId, snapshot\)/);
+  assert.match(checks, /validateBaseline/);
+  assert.match(checks, /functional_area_ha/);
+  assert.match(checks, /waterlogging_photo/);
+});
