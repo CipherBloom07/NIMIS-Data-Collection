@@ -107,3 +107,52 @@ button { max-width: 100%; }
   .topbar { gap: 7px; }
 }
 @media (max-width: 360px) { .mobile-brand strong { font-size: 11px; } .mobile-brand img { width: 30px; height: 34px; } }
+
+/* NIMIS Collect: broad viewport refinements and persistent government branding. */
+.emblem-desktop { display:block; object-fit:contain; background:#fff; }
+.emblem-mobile { display:block; object-fit:contain; background:#fff; }
+.emblem-fallback { display:inline-grid; place-items:center; flex:none; width:60px; height:60px; background:#fff; border:2px solid #d4a73b; color:#17285b; font-weight:800; border-radius:8px; }
+.mobile-brand .emblem-fallback { width:38px; height:40px; font-size:12px; }
+.logo-row { min-width:0; }
+.logo-row > div { min-width:0; overflow-wrap:anywhere; }
+.sidebar { scrollbar-width:thin; }
+.sidebar-open { max-height:100dvh; }
+button, input, select { -webkit-tap-highlight-color:transparent; }
+.field > span, .field legend, .check-option { overflow-wrap:anywhere; }
+.record { min-width:0; }
+.record-details { flex:1 1 0; min-width:0; }
+.form-footer { padding-bottom:max(12px, env(safe-area-inset-bottom)); }
+.topbar { padding-top:env(safe-area-inset-top); }
+.network { flex-shrink:0; }
+@media (max-width:800px) {
+  .sidebar { padding-top:max(20px, env(safe-area-inset-top)); }
+  .topbar { min-height:60px; height:auto; }
+  .logo-row { gap:10px; }
+  .menu-button { flex:none; min-width:44px; min-height:44px; align-items:center; justify-content:center; }
+  .mobile-brand { min-width:0; overflow:hidden; }
+  .mobile-brand strong { overflow:hidden; text-overflow:ellipsis; }
+  .survey-panel { overflow:visible; }
+  .form-footer { border-radius:0 0 14px 14px; }
+}
+@media (max-width:480px) {
+  .sidebar { width:min(300px, 90vw); }
+  .content { padding-inline:12px; }
+  .topbar .network { font-size:0; gap:0; border-radius:50%; padding:10px; min-width:40px; min-height:40px; }
+  .topbar .network svg { width:18px; height:18px; }
+  .heading-row, .panel-title { min-width:0; }
+  .step-nav { margin-inline:0; }
+  .metric { min-width:0; }
+  .record > svg { flex:none; }
+  .record-details strong { font-size:13px; }
+  .form-footer { align-items:stretch; }
+  .footer-right { width:100%; }
+}
+@media (max-width:320px) {
+  .mobile-brand strong { font-size:10px; }
+  .form-footer button { white-space:normal; line-height:1.2; }
+  .record-icon { display:none; }
+  .footer-right > button { min-width:0; }
+}
+@media (min-width:801px) {
+  .logo-row .emblem-fallback { width:66px; height:66px; }
+}
