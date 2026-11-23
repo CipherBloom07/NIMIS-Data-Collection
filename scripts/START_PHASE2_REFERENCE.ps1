@@ -65,8 +65,29 @@ if ($LASTEXITCODE -ne 0) { throw 'VENV_PYTHON_UNAVAILABLE' }
 Write-Host "VENV_PYTHON: $VenvVersion" -ForegroundColor Green
 
 Write-Host 'INSTALLING_REFERENCE_DEPENDENCIES...' -ForegroundColor Cyan
-& $VirtualPython -m pip install -r 'server\requirements.txt' --disable-pip-version-check
-if ($LASTEXITCODE -ne 0) { throw 'REFERENCE_DEPENDENCIES_FAILED' }
+Write-Host 'PACKAGE_INDEX: https://pypi.org/simple (official PyPI)' -ForegroundColor Cyan
+
+# Slow or intermittent links may cause pip to report "No matching distribution"
+# even when a compatible version exists. Force official PyPI, preserve pip cache
+# and retry with longer read/connect timeouts; never disable TLS verification.
+$Installed = $false
+for ($Attempt = 1; $Attempt -le 2; $Attempt++) {
+    Write-Host "DEPENDENCY_INSTALL_ATTEMPT: $Attempt/2" -ForegroundColor Yellow
+    & $VirtualPython -m pip install --index-url 'https://pypi.org/simple' --retries 6 --timeout 90 --prefer-binary --disable-pip-version-check -r 'server\requirements.txt'
+    if ($LASTEXITCODE -eq 0) {
+        $Installed = $true
+        break
+    }
+    if ($Attempt -eq 1) {
+        Write-Host 'PYPI_DOWNLOAD_INTERRUPTED: Retrying using the official registry.' -ForegroundColor Yellow
+    }
+}
+if (-not $Installed) {
+    Write-Host 'Network or PyPI access is preventing dependency installation.' -ForegroundColor Red
+    Write-Host 'No need to reinstall Python. Check internet/VPN/proxy then retry.' -ForegroundColor Yellow
+    Write-Host 'Diagnostic: Invoke-WebRequest -UseBasicParsing -Uri https://pypi.org/simple/pyjwt/ -TimeoutSec 60' -ForegroundColor Gray
+    throw 'REFERENCE_DEPENDENCIES_FAILED: Official PyPI package download failed'
+}
 
 Write-Host 'TESTING_REFERENCE_BACKEND...' -ForegroundColor Cyan
 & $VirtualPython -m pytest server\tests -q
