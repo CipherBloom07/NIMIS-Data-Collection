@@ -35,5 +35,5 @@ test('autosave does not enqueue a full immutable event for every keystroke', () 
 test('storage safety requires explicit acknowledgement before any future deletion', () => {
   assert.doesNotMatch(ui, /deleteDatabase\(/);
   assert.doesNotMatch(storage, /\.delete\(|\.clear\(/);
-  assert.match(ui, /browser data/);
+  assert.match(ui, /browsing data/);
 });
