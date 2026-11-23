@@ -289,7 +289,7 @@ export default function App() {
       </header>
       <div className="content">
         {notice && <div role="status" className="notice"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice('')}><X size={16}/></button></div>}
-        {!editing ? (helpView ? <HelpPanel/> : dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel/> : <>
+        {!editing ? (helpView ? <HelpPanel/> : dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel onStartSurvey={() => void startNewSurvey()}/> : <>
           <div className="heading-row"><div><div className="overline">NIMIS / FIELD OPERATIONS</div><h1>Survey dashboard</h1><p>Capture reliable irrigation scheme information across Zimbabwe.</p></div>
           <button className="primary" onClick={() => begin()}><FilePlus2 size={18}/> New survey</button></div>
           <WorkflowHome drafts={drafts} onStart={() => void startNewSurvey()} onSchemes={() => void leaveForm('schemes')} onResume={begin}/>
