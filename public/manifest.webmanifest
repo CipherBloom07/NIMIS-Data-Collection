@@ -5,12 +5,12 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#e7f4f4",
-  "theme_color": "#0a4e63",
+  "theme_color": "#17285b",
   "icons": [
     {
-      "src": "/zimbabwe-coat-of-arms.jpg",
-      "sizes": "180x158",
-      "type": "image/jpeg",
+      "src": "/zimbabwe-coat-of-arms.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
