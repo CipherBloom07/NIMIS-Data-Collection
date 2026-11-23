@@ -156,3 +156,8 @@ button, input, select { -webkit-tap-highlight-color:transparent; }
 @media (min-width:801px) {
   .logo-row .emblem-fallback { width:66px; height:66px; }
 }
+
+.field-feedback { display:block; font-size:12px; line-height:1.45; padding:7px 9px; border-radius:7px; }
+.field-feedback.error { color:#8e2727; background:#fff0f0; }
+.field-feedback.warning { color:#825200; background:#fff6df; }
+@media (max-width:800px) { .field-feedback { max-width:100%; } }
