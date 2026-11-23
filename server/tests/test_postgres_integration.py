@@ -46,16 +46,24 @@ def test_real_postgresql_reference_scope(monkeypatch):
     assert get_schemes("10000000-0000-4000-8000-000000000099") == []
 
     # Revocation must immediately hide a previously visible assignment.
-    with psycopg.connect(url) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """UPDATE nimis_collect_demo.assignment
-                   SET revoked_at = now()
-                 WHERE officer_id = %s AND scheme_id = %s""",
-                (user_id, "DEMO-SCHEME-001"),
-            )
-            assert get_actor(user_id)["scheme_ids"] == ["DEMO-SCHEME-001"]  # uncommitted update is not visible
-        conn.commit()
-
-    assert get_actor(user_id)["scheme_ids"] == []
-    assert get_schemes(user_id) == []
+    try:
+        with psycopg.connect(url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE nimis_collect_demo.assignment
+                       SET revoked_at = now()
+                     WHERE officer_id = %s AND scheme_id = %s""",
+                    (user_id, "DEMO-SCHEME-001"),
+                )
+        assert get_actor(user_id)["scheme_ids"] == []
+        assert get_schemes(user_id) == []
+    finally:
+        # Keep a persistent developer test database usable after the test.
+        with psycopg.connect(url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE nimis_collect_demo.assignment
+                       SET revoked_at = NULL
+                     WHERE officer_id = %s AND scheme_id = %s""",
+                    (user_id, "DEMO-SCHEME-001"),
+                )
