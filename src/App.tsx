@@ -8,6 +8,8 @@ import './responsive.css';
 import { validateBaseline } from './validation';
 import ReferencePanel from './ReferencePanel';
 import DataTestPanel from './DataTestPanel';
+import WorkflowHome from './WorkflowHome';
+import './workflow.css';
 import './data-test.css';
 import './reference.css';
 
@@ -62,6 +64,10 @@ export default function App() {
   }
 
   const section = sections[step];
+  const sectionCompleted = section.fields.filter(field => {
+    const value = answers[field.key];
+    return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== '';
+  }).length;
   const validation = useMemo(() => validateBaseline(answers), [answers]);
   const errors = validation.filter(issue => issue.severity === 'error');
   const warnings = validation.filter(issue => issue.severity === 'warning');
@@ -87,6 +93,47 @@ export default function App() {
     }, 450);
     return () => window.clearTimeout(timer);
   }, [answers, activeId]);
+
+  async function leaveForm(destination: 'dashboard' | 'schemes' | 'test') {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (activeId !== undefined) {
+        sessionRef.current += 1; // Cancel pending delayed autosave for this form.
+        await writeQueueRef.current;
+        if (Object.keys(answers).length > 0) {
+          await saveDraft(draftIdRef.current ?? activeId ?? null, structuredClone(answers));
+        }
+      }
+      setActiveId(undefined);
+      setReferenceView(destination === 'schemes');
+      setDataTestView(destination === 'test');
+      setMenuOpen(false);
+      await refresh();
+      if (activeId !== undefined && Object.keys(answers).length > 0) {
+        setNotice('Your latest changes were saved on this device before leaving the survey.');
+      }
+    } catch (error) {
+      setNotice('Could not save your changes. Stay on this survey and try again: ' + String(error));
+    } finally { setBusy(false); }
+  }
+
+  async function startNewSurvey() {
+    if (busy) return;
+    if (activeId !== undefined && Object.keys(answers).length > 0) {
+      setBusy(true);
+      try {
+        sessionRef.current += 1;
+        await writeQueueRef.current;
+        await saveDraft(draftIdRef.current ?? activeId ?? null, structuredClone(answers));
+        await refresh();
+      } catch (error) {
+        setNotice('Current survey could not be saved. Please try again: ' + String(error));
+        return;
+      } finally { setBusy(false); }
+    }
+    begin();
+  }
 
   async function save() {
     if (busy) return;
@@ -219,12 +266,12 @@ export default function App() {
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
       <div className="logo-row"><img src="/zimbabwe-coat-of-arms.jpg" alt="Zimbabwe national coat of arms"/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
-      <button className={'nav-button ' + (!editing && !referenceView && !dataTestView ? 'selected' : '')} onClick={() => { setDataTestView(false); setReferenceView(false); setActiveId(undefined); setMenuOpen(false); }}>
+      <button className={'nav-button ' + (!editing && !referenceView && !dataTestView ? 'selected' : '')} onClick={() => void leaveForm('dashboard')}>
         <ClipboardList size={19}/> Survey dashboard
       </button>
-      <button className="nav-button" onClick={() => begin()}><FilePlus2 size={19}/> New survey</button>
-      <button className={'nav-button ' + (referenceView ? 'selected' : '')} onClick={() => { setDataTestView(false); setActiveId(undefined); setReferenceView(true); setMenuOpen(false); }}><ClipboardList size={19}/> Assigned schemes</button>
-      {import.meta.env.DEV && <button className={'nav-button ' + (dataTestView ? 'selected' : '')} onClick={() => { setActiveId(undefined); setReferenceView(false); setDataTestView(true); setMenuOpen(false); }}><ClipboardList size={19}/> Test fictional data</button>}
+      <button className="nav-button" onClick={() => void startNewSurvey()}><FilePlus2 size={19}/> New survey</button>
+      <button className={'nav-button ' + (referenceView ? 'selected' : '')} onClick={() => void leaveForm('schemes')}><ClipboardList size={19}/> Assigned schemes</button>
+      {import.meta.env.DEV && <button className={'nav-button ' + (dataTestView ? 'selected' : '')} onClick={() => void leaveForm('test')}><ClipboardList size={19}/> Test fictional data</button>}
       <div className="aside-spacer"/>
       <div className="side-status"><CloudOff size={18}/><span>Local-only development build<br/><small>Server sync not connected</small></span></div>
     </aside>
@@ -240,6 +287,7 @@ export default function App() {
         {!editing ? (dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel/> : <>
           <div className="heading-row"><div><div className="overline">NIMIS / FIELD OPERATIONS</div><h1>Survey dashboard</h1><p>Capture reliable irrigation scheme information across Zimbabwe.</p></div>
           <button className="primary" onClick={() => begin()}><FilePlus2 size={18}/> New survey</button></div>
+          <WorkflowHome drafts={drafts} onStart={() => void startNewSurvey()} onSchemes={() => void leaveForm('schemes')} onResume={begin}/>
           <div className="metrics">
             <div className="metric"><span>Surveys saved</span><strong>{drafts.length}</strong><small>On this device</small></div>
             <div className="metric"><span>Pending synchronization</span><strong>{outboxCount}</strong><small>Awaiting secure integration</small></div>
@@ -257,23 +305,27 @@ export default function App() {
           <div className="heading-row"><div><div className="overline">IRRIGATION SCHEME QUESTIONNAIRE</div>
             <h1>{activeId ? 'Edit survey' : 'New irrigation survey'}</h1>
             <p>Save as a draft whenever you need to. GPS and photos are kept on this device.</p></div>
-            <button className="secondary" onClick={() => setActiveId(undefined)}><ArrowLeft size={17}/> Dashboard</button></div>
+            <button className="secondary" disabled={busy} onClick={() => void leaveForm('dashboard')}><ArrowLeft size={17}/> Save & dashboard</button></div>
           <div className="survey-layout"><nav className="step-nav" aria-label="Survey sections">
             {sections.map((item,index) => <button className={index === step ? 'active' : ''} key={item.name} onClick={() => setStep(index)}>
-              <span className="step-number">{index + 1}</span><span>{item.name}</span>{index < step && <Check size={15}/>}</button>)}
+              <span className="step-number">{index + 1}</span><span>{item.name}</span><span className="section-count">{item.fields.filter(field => {
+                const value = answers[field.key];
+                return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== '';
+              }).length}/{item.fields.length}</span></button>)}
           </nav><div className="panel survey-panel">
             <div className="form-header"><div><span className="overline">SECTION {step+1} OF {sections.length}</span>
-              <h2>{section.name}</h2><p>{section.fields.length} fields in this section</p></div>
+              <h2>{section.name}</h2><p>{sectionCompleted} of {section.fields.length} questions answered in this section</p></div>
               <span className="progress-text">{completed}/{allFields.length} captured</span></div>
-            <div className="progress"><div style={{width: ((completed / allFields.length)*100) + '%'}}/></div>
+            <div className="progress" role="progressbar" aria-label="Survey completion" aria-valuemin={0} aria-valuemax={allFields.length} aria-valuenow={completed}><div style={{width: ((completed / allFields.length)*100) + '%'}}/></div>
+            <div className="form-help"><strong>How to complete this section</strong>Answer the questions you know. You may skip uncertain details and come back later. Use Next section to continue, or Save draft to leave safely. Your work is stored on this device only.</div>
             <div className="form-validation" aria-live="polite"><strong>Submission readiness:</strong> {errors.length} issues to resolve, {warnings.length} warnings. Drafts can be saved at any stage.
               {(errors.length > 0 || warnings.length > 0) && <details><summary>Review validation details</summary><ul>{validation.slice(0, 15).map((issue, index) => <li key={issue.key + index} className={issue.severity}>{issue.message}</li>)}</ul></details>}
             </div>
             <div className="form-grid">{section.fields.map(fieldUI)}</div>
             <div className="form-footer"><button className="secondary" disabled={step === 0} onClick={() => setStep(s => s-1)}><ArrowLeft size={16}/> Back</button>
-              <div className="footer-right"><button className="secondary" disabled={busy} onClick={() => void save()}><Save size={16}/> Save draft</button>
+              <div className="footer-right"><button className="secondary" disabled={busy} onClick={() => void save()}><Save size={16}/> Save & dashboard</button>
                 {step < sections.length - 1 ? <button className="primary" onClick={() => setStep(s => s+1)}>Next section <ArrowRight size={16}/></button> :
-                  <button className="primary" disabled={busy} onClick={() => void save()}>Finish & save <Check size={16}/></button>}
+                  <button className="primary" disabled={busy} onClick={() => void save()}>Save completed draft <Check size={16}/></button>}
               </div></div>
           </div></div>
         </>}
