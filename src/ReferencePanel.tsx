@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Database, LockKeyhole, RefreshCw, ShieldAlert } from 'lucide-react';
+import { ArrowRight, Database, LockKeyhole, RefreshCw, ShieldAlert } from 'lucide-react';
 import { loadFictionalReferenceDemo, type ReferenceResponse } from './reference-client';
 
-export default function ReferencePanel() {
+export default function ReferencePanel({ onStartSurvey }: { onStartSurvey: () => void }) {
   const [data, setData] = useState<ReferenceResponse | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,6 +56,7 @@ export default function ReferencePanel() {
             {scheme.is_fictional && <span className="fictional-label">FICTIONAL</span>}
           </div>)}
           <p className="reference-footnote">Reference catalogue revision: {data.reference.revision}. Form catalogue: {data.formStatus}. No submissions were sent.</p>
+          <div className="reference-handoff"><div><strong>Next: collect field information</strong><p>Continue to the baseline form. Demo schemes are not automatically linked to a permanent scheme ID.</p></div><button type="button" className="primary" onClick={onStartSurvey}>Continue to survey <ArrowRight size={16}/></button></div>
         </>}
       </div>
     </div>
