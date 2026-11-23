@@ -34,6 +34,19 @@ export function formatBytes(value: number | null): string {
   return (value / (1024 * MEGABYTE)).toFixed(2) + ' GB';
 }
 
+/** Cheap quota-only check for an always-visible low-storage warning. */
+export async function quickStorageRisk(): Promise<StorageRisk> {
+  if (!navigator.storage?.estimate) return 'unknown';
+  try {
+    const estimate = await navigator.storage.estimate();
+    const usage = estimate.usage;
+    const quota = estimate.quota;
+    if (typeof usage !== 'number' || typeof quota !== 'number' ||
+        !Number.isFinite(usage) || !Number.isFinite(quota)) return 'unknown';
+    return classifyStorageRisk(Math.max(0, quota - usage), quota);
+  } catch { return 'unknown'; }
+}
+
 export async function readStorageHealth(): Promise<StorageHealth> {
   const [drafts, photoSummary, operationCount] = await Promise.all([
     listDrafts(), getPhotoStoreSummary(), countOperations(),
