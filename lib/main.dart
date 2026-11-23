@@ -52,8 +52,8 @@ class _CollectorHomeState extends State<CollectorHome> {
       Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(
         crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('Irrigation field surveys',style:Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height:8),Text('Saved surveys: '+drafts.length.toString()),
-          Text('Pending sync: '+pending.toString()),
+          const SizedBox(height:8),Text('Saved surveys: ${drafts.length}'),
+          Text('Pending sync: $pending'),
           const SizedBox(height:8),
           const Text('Offline mode: surveys are stored on this device. Server sync is not connected.',style:TextStyle(color:Color(0xFF875409))),
         ]))),
@@ -63,11 +63,10 @@ class _CollectorHomeState extends State<CollectorHome> {
       ...drafts.map((d)=>Card(child:ListTile(
         title:Text((d.answers['scheme_name'] as String?)?.isNotEmpty==true
           ?d.answers['scheme_name'].toString():'Unnamed scheme'),
-        subtitle:Text((d.answers['province']?.toString()??'Province not set')
-          +' • Revision '+d.revision.toString()),
+        subtitle:Text('${d.answers['province'] ?? 'Province not set'} • Revision ${d.revision}'),
         trailing:const Icon(Icons.chevron_right),onTap:()=>edit(d)))),
       const SizedBox(height:100),
-    ]))));
+    ])));
 }
 class SurveyEditor extends StatefulWidget {
   const SurveyEditor({super.key,required this.store,this.initial});
@@ -92,13 +91,13 @@ class _SurveyEditorState extends State<SurveyEditor> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Scheme name is required.')));
       return;
     }
-    if(saving)return;
+    if(saving){return;}
     setState(()=>saving=true);
     try{
       await widget.store.save(widget.initial?.id,answers);
       if(mounted)Navigator.of(context).pop();
     }catch(e){
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Save failed: '+e.toString())));
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Save failed: $e')));
     }finally{if(mounted)setState(()=>saving=false);}
   }
   Future<void> captureGps(SurveyField f)async{
@@ -112,7 +111,7 @@ class _SurveyEditorState extends State<SurveyEditor> {
       if(mounted)setState(()=>answers[f.key]=jsonEncode({
         'latitude':position.latitude,'longitude':position.longitude,
         'accuracy_m':position.accuracy,'captured_at':DateTime.now().toUtc().toIso8601String()}));
-    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
   }
   Widget drawField(SurveyField f){
     final value=answers[f.key];
@@ -153,7 +152,7 @@ class _SurveyEditorState extends State<SurveyEditor> {
   }
   @override Widget build(BuildContext context){
     final section=surveySections[page];
-    return Scaffold(appBar:AppBar(title:Text('Survey • '+(page+1).toString()+'/'+surveySections.length.toString())),
+    return Scaffold(appBar:AppBar(title:Text('Survey • ${page + 1}/${surveySections.length}')),
       body:SafeArea(child:Column(children:[
         LinearProgressIndicator(value:(page+1)/surveySections.length),
         Padding(padding:const EdgeInsets.all(16),
