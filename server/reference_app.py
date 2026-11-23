@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from server import postgres_reference
@@ -150,14 +150,21 @@ def forms(actor: ActorDep, since: str | None = None):
     }))
 
 @app.get("/api/v1/schemes")
-def schemes(actor: ActorDep, cursor: str | None = None):
+def schemes(
+    actor: ActorDep,
+    cursor: str | None = Query(default=None, max_length=256),
+    limit: int = Query(default=100, ge=1, le=500),
+):
     if postgres_reference.enabled():
         try:
-            # Only server-approved user assignments are used in database filtering.
-            items = postgres_reference.get_schemes(actor.user_id)
+            # Fetch one extra row to detect whether there is a next page.
+            page = postgres_reference.get_schemes(actor.user_id, limit=limit, after=cursor)
         except postgres_reference.DatabaseUnavailable:
             raise HTTPException(status_code=503, detail='Reference database unavailable') from None
-        return _no_store(JSONResponse({'items': items, 'next_cursor': None, 'has_more': False}))
+        has_more = len(page) > limit
+        items = page[:limit]
+        next_cursor = items[-1]['scheme_id'] if has_more and items else None
+        return _no_store(JSONResponse({'items': items, 'next_cursor': next_cursor, 'has_more': has_more}))
     # Explicitly fictional record available ONLY for the assigned demo account.
     fixture = [{
         "scheme_id": DEMO_SCHEME_ID, "name": "Example Scheme (fictional)",
@@ -168,7 +175,13 @@ def schemes(actor: ActorDep, cursor: str | None = None):
                record["scheme_id"] in actor.scheme_ids
                and record["district_code"] in actor.district_ids
                and record["province_code"] in actor.province_ids]
-    return _no_store(JSONResponse({"items": visible, "next_cursor": None, "has_more": False}))
+    visible = [record for record in visible if record['scheme_id'] > (cursor or '')]
+    visible.sort(key=lambda row: row['scheme_id'])
+    has_more = len(visible) > limit
+    items = visible[:limit]
+    return _no_store(JSONResponse({"items": items,
+                                   "next_cursor": items[-1]['scheme_id'] if has_more and items else None,
+                                   "has_more": has_more}))
 
 @app.post("/api/v1/auth/device/enrol")
 @app.post("/api/v1/sync/push")
