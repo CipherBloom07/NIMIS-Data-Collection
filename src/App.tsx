@@ -8,6 +8,7 @@ import './responsive.css';
 import { validateBaseline } from './validation';
 import ReferencePanel from './ReferencePanel';
 import DataTestPanel from './DataTestPanel';
+import './data-test.css';
 import './reference.css';
 
 function getText(value: Answer | undefined): string {
