@@ -30,7 +30,7 @@ This PDF is the **project requirement specification** for implementation decisio
 
 **Phase 1 — Foundations:** draft design documents available. Pending formal validation of the full baseline data model and approval of recurring forms 2–11.
 
-**Phase 2 — Access and reference:** versioned local form/reference cache has been added for a future secured sync. Server auth, device enrolment and role/scope enforcement are not yet connected.
+**Phase 2 — Access and reference:** versioned local form/reference cache is implemented. A local FastAPI reference server now checks a short-lived test token, loads a fictional officer's role and scheme assignments on the server, and exposes read-only /me, /reference, /forms and /schemes routes. A React Assigned schemes screen demonstrates that reference feed. This is **fictional development access only**; approved Ministry authentication, device enrolment, real geographic reference downloads and production authorization are NOT complete.
 
 **Phase 3 — Capture:** offline PWA survey and photos are prototypes. User-facing local autosave and validation exist, but Android Keystore encryption, GPS boundary walking and complete dynamic form engine remain outstanding.
 
