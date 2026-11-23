@@ -94,9 +94,16 @@ Write-Host 'TESTING_REFERENCE_BACKEND...' -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw 'REFERENCE_TESTS_FAILED' }
 
 # A fresh secret is generated for each local run and never committed.
-$Bytes = [byte[]]::new(48)
-[System.Security.Cryptography.RandomNumberGenerator]::Fill($Bytes)
-$env:NIMIS_DEV_JWT_SECRET = [Convert]::ToBase64String($Bytes)
+$Bytes = New-Object byte[] 48
+$Rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $Rng.GetBytes($Bytes)
+    $env:NIMIS_DEV_JWT_SECRET = [Convert]::ToBase64String($Bytes)
+}
+finally {
+    $Rng.Dispose()
+    [Array]::Clear($Bytes, 0, $Bytes.Length)
+}
 $env:NIMIS_DEMO_MODE = '1'
 
 Write-Host 'BACKEND_DEV_MODE: FICTIONAL_DATA_ONLY' -ForegroundColor Yellow
