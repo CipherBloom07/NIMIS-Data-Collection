@@ -5,12 +5,12 @@ const f = (key: string, label: string, type: FieldType = 'text', options?: strin
   ({ key, label, type, options, required });
 const yesNo = ['Yes', 'No'];
 const grade = ['Good', 'Moderate', 'Bad'];
-export const provinces = ['Bulawayo','Harare','Manicaland','Mashonaland Central','Mashonaland East','Mashonaland West','Masvingo','Matabeleland North','Matabeleland South','Midlands'];
+export const provinces = ['Masvingo','Manicaland','Midlands','Mashonaland East','Mashonaland West','Mashonaland Central','Matabeleland South','Matabeleland North'];
 
 export const sections: SurveySection[] = [
   { name: 'Scheme demographics', fields: [
-    f('site_name','Site name'), f('scheme_name','Irrigation scheme name','text',undefined,true),
-    f('scheme_photo','Photograph of irrigation scheme','photo'),
+    f('site_name','Site name','text',undefined,true), f('scheme_name','Irrigation scheme name','text',undefined,true),
+    f('scheme_photo','Photograph of irrigation scheme','photo',undefined,true),
     f('province','Province','select',provinces,true), f('district','District','text',undefined,true), f('ward','Ward'),
     f('scheme_gps','Scheme location (preferably at gate)','gps'),
     f('officer_name','Contributing officer name'), f('officer_designation','Designation'),
@@ -66,7 +66,7 @@ export const sections: SurveySection[] = [
     f('weather_records','Weather components recorded','multi',['Rainfall','Temperature','Wind speed','Wind direction','Other']),
   ]},
   { name: 'Agronomy and markets', fields: [
-    f('major_crops','Major crops grown','multi',['Green mealies','Grain maize','Wheat','Potatoes','Butternuts','Tomatoes','Onions','Chilly','Sugar beans','Chomolia','Other']),
+    f('major_crops','Major crops grown','multi',['Green mealies','Grain maize','Wheat','Potatoes','Butternuts','Tomatoes','Onions','Chilli','Sugar beans','Chomolia','Other']),
     f('similar_crops','Farmers grow similar crops','select',yesNo),
     f('markets','Major markets for produce'), f('market_analysis','Market analysis before planting','select',yesNo),
   ]},
