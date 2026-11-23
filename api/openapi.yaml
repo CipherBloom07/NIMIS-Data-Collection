@@ -1,0 +1,226 @@
+openapi: 3.1.0
+info:
+  title: NIMIS Collect Synchronization API
+  version: 0.1.0-draft
+  description: Proposed contract for Department review. No production server is deployed by this specification.
+servers:
+  - url: https://nimis-api.example.invalid/api/v1
+    description: Placeholder only; not a live endpoint
+security:
+  - bearerAuth: []
+paths:
+  /auth/device/enrol:
+    post:
+      summary: Authenticate and enrol a registered field device
+      operationId: enrolDevice
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enrolment_token, device_public_key]
+              properties:
+                enrolment_token: { type: string }
+                device_public_key: { type: string }
+      responses:
+        '200':
+          description: Device enrolled; returns scoped credentials, server time and offline grace
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_id: { type: string, format: uuid }
+                  offline_grace_days: { type: integer, default: 30 }
+                  server_time: { type: string, format: date-time }
+        '403': { $ref: '#/components/responses/Problem' }
+  /auth/token:
+    post:
+      summary: Sign in with individual user account and device proof
+      security: []
+      responses:
+        '200': { description: Authenticated; short-lived access token and secured refresh method }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/refresh:
+    post:
+      summary: Rotate device-bound refresh token
+      security: []
+      responses:
+        '200': { description: Rotated session }
+        '401': { $ref: '#/components/responses/Problem' }
+  /me:
+    get:
+      summary: Current user, device status, role, geographic scope and assignments
+      responses:
+        '200': { description: User and permissions payload }
+        '403': { $ref: '#/components/responses/Problem' }
+  /reference:
+    get:
+      summary: Retrieve versioned provinces/districts/wards and picklists
+      parameters:
+        - { in: query, name: since, schema: { type: string } }
+      responses:
+        '200': { description: Reference data, tombstones and cursor }
+  /forms:
+    get:
+      summary: Download versioned form schemas with conditional logic
+      parameters:
+        - { in: query, name: since, schema: { type: string } }
+      responses:
+        '200': { description: Schemas, versions, compatibility window and cursor }
+  /schemes:
+    get:
+      summary: Download only role-scoped scheme masters and assignments
+      parameters:
+        - { in: query, name: cursor, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 500 } }
+      responses:
+        '200': { description: Paginated scope-limited masters with version and tombstones }
+  /sync/push:
+    post:
+      summary: Push immutable operations; each operation is idempotent
+      operationId: pushOperations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, operations]
+              properties:
+                device_id: { type: string, format: uuid }
+                operations:
+                  type: array
+                  maxItems: 100
+                  items: { $ref: '#/components/schemas/Operation' }
+      responses:
+        '200':
+          description: Per-operation result, including duplicates, rejects and conflicts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [server_time, results]
+                properties:
+                  server_time: { type: string, format: date-time }
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/PushResult' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /sync/pull:
+    get:
+      summary: Fetch role-scoped deltas (reference, schemes, forms, submissions and decisions)
+      parameters:
+        - { in: query, name: cursor, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 500 } }
+      responses:
+        '200': { description: Delta page with server cursor and tombstones }
+  /attachments:
+    post:
+      summary: Start resumable private attachment upload with checksum
+      responses:
+        '201': { description: Upload identifier, chunk size and authorization }
+  /attachments/{id}/chunks/{n}:
+    put:
+      summary: Upload a numbered chunk (retry-safe)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: n, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        '204': { description: Chunk acknowledged }
+  /attachments/{id}/complete:
+    post:
+      summary: Verify checksum and finalize private object
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Attachment confirmed }
+  /submissions/{id}/decisions:
+    post:
+      summary: Record a role-authorized verify, review or return decision
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '201': { description: Append-only decision accepted }
+        '409': { $ref: '#/components/responses/Problem' }
+  /submissions/{id}/history:
+    get:
+      summary: Immutable submission versions, decisions and audit history
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: History in server-received order }
+  /scheme-requests:
+    post:
+      summary: Propose a new scheme and get duplicate candidates; never creates master directly
+      responses:
+        '202': { description: Pending DIDO review with possible duplicate candidates }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: RFC 9457-style problem details including field errors
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            properties:
+              type: { type: string, format: uri-reference }
+              title: { type: string }
+              status: { type: integer }
+              detail: { type: string }
+              errors:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field: { type: string }
+                    message: { type: string }
+  schemas:
+    Operation:
+      type: object
+      required: [event_id, local_sequence, record_id, device_id, user_id, form_id, form_version, captured_at, action, data]
+      properties:
+        event_id: { type: string, format: uuid }
+        record_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        scheme_id: { type: [string, 'null'] }
+        temporary_scheme_id: { type: [string, 'null'], format: uuid }
+        form_id: { type: string }
+        form_version: { type: integer }
+        local_sequence: { type: integer, minimum: 1 }
+        period: { type: [string, 'null'] }
+        season: { type: [string, 'null'] }
+        captured_at: { type: string, format: date-time }
+        clock_offset_seconds: { type: number }
+        base_version: { type: [integer, 'null'] }
+        action: { enum: [save, submit, verify, review, return] }
+        data: { type: object, additionalProperties: true }
+        attachments:
+          type: array
+          items: { type: string, format: uuid }
+        provenance:
+          type: object
+          properties:
+            source_type: { enum: [officer, manager, telemetry, satellite, manual] }
+            units: { type: object, additionalProperties: { type: string } }
+    PushResult:
+      type: object
+      required: [event_id, outcome]
+      properties:
+        event_id: { type: string, format: uuid }
+        outcome: { enum: [accepted, accepted_with_warnings, rejected, duplicate, conflict] }
+        server_revision: { type: [integer, 'null'] }
+        received_at: { type: [string, 'null'], format: date-time }
+        field_errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
