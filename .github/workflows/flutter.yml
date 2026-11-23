@@ -14,6 +14,8 @@ jobs:
           cache: true
       - name: Bootstrap Android project
         run: flutter create --platforms android --project-name nimis_field_collector .
+      - name: Remove unused Flutter template widget test
+        run: rm -f test/widget_test.dart
       - name: Resolve dependencies
         run: flutter pub get
       - name: Static analysis
