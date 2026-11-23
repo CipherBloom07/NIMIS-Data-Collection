@@ -185,7 +185,7 @@ export default function App() {
   const editing = activeId !== undefined;
   return <div className="shell">
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
-      <div className="logo-row"><img src="/zimbabwe-coat-of-arms.png" alt="Zimbabwe national coat of arms" onError={event => { event.currentTarget.style.display = 'none'; }}/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
+      <div className="logo-row"><img src="/zimbabwe-coat-of-arms.svg" alt="Zimbabwe national coat of arms" onError={event => { event.currentTarget.style.display = 'none'; }}/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
       <button className={'nav-button ' + (!editing ? 'selected' : '')} onClick={() => { setActiveId(undefined); setMenuOpen(false); }}>
         <ClipboardList size={19}/> Survey dashboard
