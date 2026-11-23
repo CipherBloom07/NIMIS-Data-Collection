@@ -1,0 +1,24 @@
+name: Flutter code checks
+on:
+  push:
+    branches: [main, feat/field-collector-foundation]
+  pull_request:
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Bootstrap Android project
+        run: flutter create --platforms android --project-name nimis_field_collector .
+      - name: Remove unused Flutter template widget test
+        run: rm -f test/widget_test.dart
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Static analysis
+        run: flutter analyze
+      - name: Unit tests
+        run: flutter test
