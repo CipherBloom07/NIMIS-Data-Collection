@@ -6,6 +6,7 @@ export default function ReferencePanel({ onStartSurvey }: { onStartSurvey: () =>
   const [data, setData] = useState<ReferenceResponse | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(30);
 
   async function connect() {
     if (loading) return;
@@ -14,6 +15,7 @@ export default function ReferencePanel({ onStartSurvey }: { onStartSurvey: () =>
     try {
       const response = await loadFictionalReferenceDemo();
       setData(response);
+      setVisibleCount(30);
     } catch (failure) {
       setData(null);
       setError(failure instanceof Error ? failure.message : 'Unknown reference error');
@@ -51,11 +53,12 @@ export default function ReferencePanel({ onStartSurvey }: { onStartSurvey: () =>
           </div>
           <h3>Assigned scheme records</h3>
           {data.schemes.length === 0 && <p>No schemes assigned to this account.</p>}
-          {data.schemes.map(scheme => <div className="reference-record" key={scheme.scheme_id}>
+          {data.schemes.slice(0, visibleCount).map(scheme => <div className="reference-record" key={scheme.scheme_id}>
             <Database size={20}/><div><strong>{scheme.name}</strong>
             <p>{scheme.scheme_id} · {scheme.district_code} · Master version {scheme.master_version}</p></div>
             {scheme.is_fictional && <span className="fictional-label">FICTIONAL</span>}
           </div>)}
+          {data.schemes.length > visibleCount && <button type="button" className="secondary" onClick={() => setVisibleCount(count => count + 30)}>Show more schemes ({visibleCount} of {data.schemes.length})</button>}
           <p className="reference-footnote">Reference catalogue revision: {data.reference.revision}. Form catalogue: {data.formStatus}. No submissions were sent.</p>
           <div className="reference-handoff"><div><strong>Next: collect field information</strong><p>Continue to the baseline form. Demo schemes are not automatically linked to a permanent scheme ID.</p></div><button type="button" className="primary" onClick={onStartSurvey}>Continue to survey <ArrowRight size={16}/></button></div>
         </>}
