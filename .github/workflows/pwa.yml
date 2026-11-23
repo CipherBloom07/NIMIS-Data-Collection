@@ -1,7 +1,7 @@
 name: NIMIS PWA validation
 on:
   push:
-    branches: [main, feat/offline-pwa-foundation]
+    branches: [main, feat/offline-pwa-foundation, feat/collect-v1-brand-responsive]
   pull_request:
 jobs:
   build:
