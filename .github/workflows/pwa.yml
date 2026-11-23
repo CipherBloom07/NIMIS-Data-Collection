@@ -6,6 +6,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nimis_collect_dev
+          POSTGRES_USER: nimis_demo
+          POSTGRES_PASSWORD: ci-only-postgres-test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U nimis_demo -d nimis_collect_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,7 +34,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install reference API test dependencies
-        run: python -m pip install -r server/requirements.txt
-      - name: Test scoped reference API
+      - name: Install PostgreSQL integration test dependencies
+        run: python -m pip install -r server/requirements-postgres.txt
+      - name: Test scoped reference API and real PostgreSQL database
+        env:
+          NIMIS_TEST_POSTGRES_URL: postgresql://nimis_demo:ci-only-postgres-test@127.0.0.1:55432/nimis_collect_dev
         run: python -m pytest server/tests -q
