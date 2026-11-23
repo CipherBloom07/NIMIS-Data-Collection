@@ -1,4 +1,5 @@
 import { schemaVersion } from './survey';
+import { compressFieldPhoto, PHOTO_MAX_SOURCE_BYTES } from './photo-compression';
 
 export type Answer = string | string[] | number | null | { latitude: number; longitude: number; accuracy_m: number; captured_at: string };
 export type SurveyAnswers = Record<string, Answer>;
@@ -123,15 +124,34 @@ export async function getPhotoStoreSummary(): Promise<{ count: number; bytes: nu
 
 export async function savePhoto(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Select an image file.');
-  if (file.size > 12 * 1024 * 1024) throw new Error('Photo is larger than 12MB.');
+  if (file.size > PHOTO_MAX_SOURCE_BYTES) throw new Error('Photo is larger than 12 MB.');
+  const compressed = await compressFieldPhoto(file);
+  // A quota estimate is advisory; the transaction is authoritative.
+  if (navigator.storage?.estimate) {
+    try {
+      const estimate = await navigator.storage.estimate();
+      if (typeof estimate.usage === 'number' && typeof estimate.quota === 'number' &&
+          estimate.quota - estimate.usage < compressed.size + 5 * 1024 * 1024) {
+        throw new DOMException('Not enough browser storage for another photo. Open Storage Management.', 'QuotaExceededError');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') throw error;
+      // Some browsers do not provide estimates; IndexedDB will enforce the quota.
+    }
+  }
   const id = crypto.randomUUID();
   const db = await openDatabase();
   try {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction('photos', 'readwrite');
-      tx.objectStore('photos').put({ id, filename: file.name, mime: file.type, blob: file });
+      tx.objectStore('photos').put({
+        id, filename: file.name.replace(/\\.[^.]+$/, '') + '.jpg', mime: 'image/jpeg',
+        blob: compressed, originalBytes: file.size, savedBytes: compressed.size,
+        compressedAt: new Date().toISOString(),
+      });
       tx.oncomplete = () => resolve(id);
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('Photo save interrupted'));
     });
   } finally { db.close(); }
 }
