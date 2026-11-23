@@ -107,3 +107,13 @@ button { max-width: 100%; }
   .topbar { gap: 7px; }
 }
 @media (max-width: 360px) { .mobile-brand strong { font-size: 11px; } .mobile-brand img { width: 30px; height: 34px; } }
+
+/* Form readiness and accessible focus/field hints */
+.form-validation { margin: 18px 30px 0; padding: 13px 16px; border: 1px solid #cbdcce;
+  background: #f5faf5; border-radius: 11px; font-size: 13px; color: #27443e; line-height: 1.5; }
+.form-validation strong { color: #174b32; }
+.form-validation summary { cursor: pointer; font-weight: 700; padding: 7px 0; }
+.form-validation ul { margin: 6px 0 0; padding-left: 21px; max-height: 190px; overflow: auto; }
+.form-validation li.error { color: #a13d32; }
+.form-validation li.warning { color: #855e14; }
+@media (max-width: 600px) { .form-validation { margin: 14px 14px 0; } }
