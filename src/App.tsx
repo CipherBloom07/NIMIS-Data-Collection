@@ -10,6 +10,19 @@ function getText(value: Answer | undefined): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 }
 const newValues = (): SurveyAnswers => ({});
+
+/** The supplied national coat of arms is embedded in an SVG, keeping it
+ * available offline even if the original JPEG asset path was cached. */
+const COAT_OF_ARMS = '/zimbabwe-coat-of-arms.svg?v=4';
+function GovernmentEmblem({ mobile = false }: { mobile?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  return failed
+    ? <span className="emblem-fallback" role="img" aria-label="Zimbabwe national coat of arms unavailable">ZW</span>
+    : <img className={mobile ? 'emblem-mobile' : 'emblem-desktop'}
+        src={COAT_OF_ARMS}
+        alt="Coat of arms of Zimbabwe"
+        onError={() => setFailed(true)}/>;
+}
 export default function App() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [outboxCount, setOutboxCount] = useState(0);
@@ -187,7 +200,7 @@ export default function App() {
   return <div className="shell">
     {menuOpen && <button type="button" className="mobile-scrim" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
-      <div className="logo-row"><img src="/zimbabwe-coat-of-arms.jpg" alt="Zimbabwe national coat of arms"/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
+      <div className="logo-row"><GovernmentEmblem/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
       <button className={'nav-button ' + (!editing ? 'selected' : '')} onClick={() => { setActiveId(undefined); setMenuOpen(false); }}>
         <ClipboardList size={19}/> Survey dashboard
@@ -199,7 +212,7 @@ export default function App() {
     <main className="main">
       <header className="topbar">
         <button type="button" className="menu-button" aria-label="Open menu" onClick={() => setMenuOpen(!menuOpen)}><Menu/></button>
-        <div className="mobile-brand"><img src="/zimbabwe-coat-of-arms.jpg" alt="Zimbabwe coat of arms"/><strong>NIMIS Collect</strong></div>
+        <div className="mobile-brand"><GovernmentEmblem mobile/><strong>NIMIS Collect</strong></div>
         <span className="eyebrow">MINISTRY OF AGRICULTURE · DEPARTMENT OF IRRIGATION</span>
         <span className={'network ' + (online ? 'connected' : '')}>{online ? <Wifi size={16}/> : <WifiOff size={16}/>} {online ? 'Network available' : 'Offline'}</span>
       </header>
