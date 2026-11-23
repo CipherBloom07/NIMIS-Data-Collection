@@ -43,7 +43,7 @@ class SurveyStore {
       await tx.insert('surveys', {
         'id':id,'answers':jsonEncode(answers),'revision':revision,'modified_at':now.toIso8601String()
       },conflictAlgorithm:ConflictAlgorithm.replace);
-      final eventId=id+':'+revision.toString();
+      final eventId='$id:$revision';
       await tx.insert('outbox',{
         'survey_id':id,'revision':revision,'event_id':eventId,
         'payload':jsonEncode({'event_id':eventId,'survey_id':id,'revision':revision,'answers':answers})
