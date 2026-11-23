@@ -199,6 +199,7 @@ export default function App() {
     <main className="main">
       <header className="topbar">
         <button type="button" className="menu-button" aria-label="Open menu" onClick={() => setMenuOpen(!menuOpen)}><Menu/></button>
+        <div className="mobile-brand"><img src="/zimbabwe-coat-of-arms.jpg" alt="Zimbabwe coat of arms"/><strong>NIMIS Collect</strong></div>
         <span className="eyebrow">MINISTRY OF AGRICULTURE · DEPARTMENT OF IRRIGATION</span>
         <span className={'network ' + (online ? 'connected' : '')}>{online ? <Wifi size={16}/> : <WifiOff size={16}/>} {online ? 'Network available' : 'Offline'}</span>
       </header>
