@@ -1,6 +1,6 @@
-const CACHE = 'nimis-field-shell-v2';
+const CACHE = 'nimis-field-shell-v3';
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(['/', '/manifest.webmanifest', '/zimbabwe-coat-of-arms.svg'])));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(['/', '/manifest.webmanifest', '/zimbabwe-coat-of-arms.jpg'])));
   self.skipWaiting();
 });
 self.addEventListener('activate', event => {
@@ -8,7 +8,9 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
+  const url = new URL(event.request.url);
+  // Never cache authenticated API responses or private data in the app shell.
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || event.request.headers.has('Authorization')) return;
   event.respondWith(fetch(event.request).then(response => {
     if (response.ok) {
       const copy = response.clone();
