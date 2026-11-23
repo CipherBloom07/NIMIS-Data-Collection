@@ -21,6 +21,7 @@ export type ReferenceResponse = {
   schemes: AssignedScheme[];
   formCount: number;
   formStatus: string;
+  referenceStorage: 'postgresql_demo' | 'in_memory_demo';
 };
 
 const base = '/api/v1';
@@ -67,5 +68,6 @@ export async function loadFictionalReferenceDemo(): Promise<ReferenceResponse> {
     schemes: schemePage.items,
     formCount: forms.definitions.length,
     formStatus: forms.review_status,
+    referenceStorage: (reference as ReferenceBundle & { reference_storage?: 'postgresql_demo' | 'in_memory_demo' }).reference_storage ?? 'in_memory_demo',
   };
 }
