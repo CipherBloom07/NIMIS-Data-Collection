@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Camera, Check, ClipboardList, CloudOff, Download
 import { allFields, sections, type SurveyField } from './survey';
 import { listDrafts, listOutbox, loadPhoto, saveDraft, savePhoto, type Draft, type SurveyAnswers, type Answer } from './storage';
 import './styles.css';
+import './official-theme.css';
 
 function getText(value: Answer | undefined): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
@@ -184,7 +185,7 @@ export default function App() {
   const editing = activeId !== undefined;
   return <div className="shell">
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
-      <div className="logo-row"><img src="/nimis-icon.svg" alt="NIMIS logo"/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
+      <div className="logo-row"><img src="/zimbabwe-coat-of-arms.png" alt="Zimbabwe national coat of arms" onError={event => { event.currentTarget.style.display = 'none'; }}/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
       <button className={'nav-button ' + (!editing ? 'selected' : '')} onClick={() => { setActiveId(undefined); setMenuOpen(false); }}>
         <ClipboardList size={19}/> Survey dashboard
