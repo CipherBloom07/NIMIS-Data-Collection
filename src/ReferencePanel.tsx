@@ -47,6 +47,7 @@ export default function ReferencePanel({ onStartSurvey }: { onStartSurvey: () =>
             <div><strong>District scope</strong><span>{data.actor.district_ids.join(', ') || 'None'}</span></div>
             <div><strong>Visible schemes</strong><span>{data.schemes.length}</span></div>
             <div><strong>Proposed form definitions</strong><span>{data.formCount}</span></div>
+            <div><strong>Reference database</strong><span>{data.referenceStorage === 'postgresql_demo' ? 'PostgreSQL (fictional)' : 'In-memory demo'}</span></div>
           </div>
           <h3>Assigned scheme records</h3>
           {data.schemes.length === 0 && <p>No schemes assigned to this account.</p>}
