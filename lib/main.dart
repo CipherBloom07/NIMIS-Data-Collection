@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'survey_schema.dart';
+import 'photo_store.dart';
 import 'survey_store.dart';
 
 Future<void> main() async {
@@ -79,6 +80,7 @@ class _SurveyEditorState extends State<SurveyEditor> {
   final Map<String,TextEditingController> controllers={};
   int page=0;
   bool saving=false;
+  final PhotoStore photoStore = PhotoStore();
   @override void dispose(){
     for(final controller in controllers.values){controller.dispose();}
     super.dispose();
@@ -95,7 +97,7 @@ class _SurveyEditorState extends State<SurveyEditor> {
     setState(()=>saving=true);
     try{
       await widget.store.save(widget.initial?.id,answers);
-      if(mounted)Navigator.of(context).pop();
+      if(mounted) { Navigator.of(context).pop(); }
     }catch(e){
       if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Save failed: $e')));
     }finally{if(mounted)setState(()=>saving=false);}
@@ -113,6 +115,22 @@ class _SurveyEditorState extends State<SurveyEditor> {
         'accuracy_m':position.accuracy,'captured_at':DateTime.now().toUtc().toIso8601String()}));
     }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
   }
+  Future<void> capturePhoto(SurveyField field) async {
+    try {
+      final path = await photoStore.captureCameraPhoto();
+      if (path == null) return;
+      if (mounted) {
+        setState(() => answers[field.key] = path);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Camera capture failed: $error')),
+        );
+      }
+    }
+  }
+
   Widget drawField(SurveyField f){
     final value=answers[f.key];
     switch(f.input){
@@ -145,9 +163,14 @@ class _SurveyEditorState extends State<SurveyEditor> {
           subtitle:Text(value?.toString()??'Tap to capture GPS'),
           trailing:const Icon(Icons.my_location),onTap:()=>captureGps(f));
       case SurveyInput.photo:
-        return ListTile(title:Text(f.label),
-          subtitle:const Text('Camera attachment planned for the next stage'),
-          trailing:const Icon(Icons.camera_alt_outlined));
+        return ListTile(
+          title:Text(f.label),
+          subtitle:Text(value is String && value.isNotEmpty
+              ? 'Photo saved locally · Tap to replace'
+              : 'Tap to take a photograph'),
+          trailing:const Icon(Icons.camera_alt_outlined),
+          onTap:()=>capturePhoto(f),
+        );
     }
   }
   @override Widget build(BuildContext context){
