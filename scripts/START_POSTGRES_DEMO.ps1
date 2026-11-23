@@ -4,6 +4,11 @@ Set-Location -LiteralPath $Root
 
 Write-Host '=== NIMIS POSTGRESQL FICTIONAL DATA SETUP ===' -ForegroundColor Cyan
 Write-Host 'LOCAL DEVELOPMENT ONLY: No real Ministry records or farmer data.' -ForegroundColor Yellow
+$RunningApi = Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue
+if ($RunningApi) {
+    Write-Host 'STOP_OLD_BACKEND: Go to the previous FastAPI terminal and press Ctrl+C.' -ForegroundColor Yellow
+    throw 'PORT_8765_ALREADY_IN_USE: Stop the earlier reference API before launching PostgreSQL mode.'
+}
 $DockerCommand = Get-Command docker -ErrorAction SilentlyContinue
 if (-not $DockerCommand) {
     throw 'DOCKER_NOT_INSTALLED: Install Docker Desktop to run the isolated local PostgreSQL test, or use an existing PostgreSQL 16 instance following docs/POSTGRESQL_SETUP.md.'
