@@ -44,3 +44,11 @@ Note: the icon in the PWA is a simple provisional NIMIS graphic, **not** an inve
 - Colors derive from its green shield, blue-and-white stripes, gold Zimbabwe bird and red star. Definitions: `src/official-theme.css`.
 - Primary green `#08643a`, blue `#2f3b83`, gold `#d4a73b`, red `#c84436`, off-white `#faf8f0`.
 - For full-resolution print collateral, use the original supplied source image rather than the optimized web asset.
+
+## Brief alignment — 2026-11-23
+- Visual responsiveness and logo: `src/responsive.css` and native `public/zimbabwe-coat-of-arms.jpg`.
+- Architecture assumptions and unresolved security choices: `docs/ADR-001-architecture.md`.
+- API-first draft: `api/openapi.yaml` (placeholder host; not deployed).
+- Forms catalogue and proposed keys: `docs/DATA_DICTIONARY.md`; forms 2–11 require Department approval.
+- Reference SQL model: `server/schema/001_nimis_collect_REFERENCE_ONLY.sql` (not executed).
+- **Production completion is not claimed:** offline encrypted storage, enrolment, auth, role-scope, verification workflow, bidirectional sync, attachments, boundary walk and all 15 acceptance tests remain to be implemented and validated.
