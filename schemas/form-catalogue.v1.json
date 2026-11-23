@@ -1,0 +1,907 @@
+{
+  "status": "DRAFT — Department approval required before implementing forms 2–11",
+  "version": "0.1",
+  "governance": {
+    "scheme_master_id": "assigned by server only",
+    "measurement": "Every measurement stores {value, unit, observed_at, source, captured_by}",
+    "submission": "Append-only: record_id, form_id, form_version, scheme_id, period, season, provenance, base_version, prior_submission_id",
+    "role_scope": "server-enforced; locally cached role is display-only"
+  },
+  "forms": [
+    {
+      "form_id": "baseline",
+      "form_version": 1,
+      "name": "Scheme Baseline Survey",
+      "frequency": "At registration, annually and material changes",
+      "roles": [
+        "scheme_manager",
+        "field_officer",
+        "dido"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "site_name",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "scheme_name",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "scheme_gps",
+          "type": "point",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "scheme_photo",
+          "type": "photo",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "province",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "district",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "ward",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "officers",
+          "type": "repeating_group",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "equipped_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "expansion_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "functional_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "water_sources",
+          "type": "repeating_group",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "beneficiaries",
+          "type": "integer",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "irrigation_system",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "energy_source",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "infrastructure",
+          "type": "repeating_group",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "maintenance",
+          "type": "group",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "water_management",
+          "type": "group",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "weather_station",
+          "type": "group",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "major_crops",
+          "type": "multi",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "challenges",
+          "type": "multi",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "operational_status",
+      "form_version": 1,
+      "name": "Scheme Operational Status",
+      "frequency": "Monthly and material change",
+      "roles": [
+        "scheme_manager",
+        "field_officer",
+        "dido"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "status",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "equipped_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "developed_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "functional_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "actually_irrigated_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "nonfunctional_reason",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "active_beneficiaries",
+          "type": "integer",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "main_issues",
+          "type": "multi",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "observed_at",
+          "type": "datetime",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "source",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "seasonal_production",
+      "form_version": 1,
+      "name": "Seasonal Cropping and Production",
+      "frequency": "Monthly in season and at harvest",
+      "roles": [
+        "scheme_manager",
+        "field_officer"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "season_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "crop_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "planted_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "harvested_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "yield",
+          "type": "measurement:tonnes_per_ha",
+          "units": "tonnes_per_ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "production",
+          "type": "measurement:tonnes",
+          "units": "tonnes",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "market_destination",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "observed_at",
+          "type": "datetime",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "source",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "water_availability",
+      "form_version": 1,
+      "name": "Water Availability and Abstraction",
+      "frequency": "Weekly where possible",
+      "roles": [
+        "scheme_manager",
+        "field_officer"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "water_source_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "reading_type",
+          "type": "choice:gauge_visual_estimate",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "water_level",
+          "type": "measurement:m",
+          "units": "m",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "storage_percent",
+          "type": "measurement:percent",
+          "units": "percent",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "flow",
+          "type": "measurement:m3_per_s",
+          "units": "m3_per_s",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "abstraction_volume",
+          "type": "measurement:m3",
+          "units": "m3",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "rainfall",
+          "type": "measurement:mm",
+          "units": "mm",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "observed_at",
+          "type": "datetime",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "source",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "infrastructure_incident",
+      "form_version": 1,
+      "name": "Infrastructure Assessment and Incident",
+      "frequency": "Annually and after major incidents",
+      "roles": [
+        "field_officer",
+        "dido"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "asset_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "asset_class",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "condition",
+          "type": "choice:good_moderate_bad",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "severity",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "incident_description",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "photo_ids",
+          "type": "attachments",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "mitigation",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "responsible_officer_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "closure_evidence",
+          "type": "attachments",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "observed_at",
+          "type": "datetime",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "om_finance",
+      "form_version": 1,
+      "name": "Operations Maintenance and Finance",
+      "frequency": "Monthly",
+      "roles": [
+        "scheme_manager",
+        "dido"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "maintenance_activities",
+          "type": "repeating_group",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "work_order_ids",
+          "type": "reference_list",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "expenditure",
+          "type": "measurement:USD_or_ZWG",
+          "units": "USD_or_ZWG",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "farmer_contributions",
+          "type": "measurement:USD_or_ZWG",
+          "units": "USD_or_ZWG",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "levy_paid",
+          "type": "choice:yes_no",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "om_fund_balance",
+          "type": "measurement:USD_or_ZWG",
+          "units": "USD_or_ZWG",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "observed_at",
+          "type": "datetime",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "source",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "energy_power",
+      "form_version": 1,
+      "name": "Energy and Power Status",
+      "frequency": "Weekly for connections; monthly otherwise",
+      "roles": [
+        "scheme_manager",
+        "field_officer"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "energy_source",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "grid_connected",
+          "type": "choice:yes_no",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "meter_reference",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "solar_status",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "outage_hours",
+          "type": "measurement:hours",
+          "units": "hours",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "bill_status",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "observed_at",
+          "type": "datetime",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "source",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "project_update",
+      "form_version": 1,
+      "name": "Project Implementation Update",
+      "frequency": "Weekly, consolidated monthly",
+      "roles": [
+        "dido",
+        "project_officer"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "programme",
+          "type": "choice:SI87_B1_B2_B3_B4_SIRP_other",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "project_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "target_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "substantially_complete_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "progress_percent",
+          "type": "measurement:percent",
+          "units": "percent",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "milestone_status",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "contractor_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "power_connection_status",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "risks_delays",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "photos",
+          "type": "attachments",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "observed_at",
+          "type": "datetime",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "risk_register",
+      "form_version": 1,
+      "name": "Risk Register Update",
+      "frequency": "Monthly and material change",
+      "roles": [
+        "dido",
+        "field_officer"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "risk_id",
+          "type": "reference_or_uuid",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "risk_description",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "severity",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "mitigation",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "responsible_officer_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "status",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "review_date",
+          "type": "date",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "farmer_plot",
+      "form_version": 1,
+      "name": "Farmer and Plot Register",
+      "frequency": "Enrolment and change",
+      "roles": [
+        "scheme_manager",
+        "dido"
+      ],
+      "sensitive": true,
+      "fields": [
+        {
+          "field_id": "beneficiary_reference",
+          "type": "pseudonymous_reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "plot_id",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "plot_area_ha",
+          "type": "measurement:ha",
+          "units": "ha",
+          "metadata": [
+            "observed_at",
+            "source",
+            "captured_by"
+          ]
+        },
+        {
+          "field_id": "tenure",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "occupancy",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "enrolled_at",
+          "type": "datetime",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "source",
+          "type": "choice",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    },
+    {
+      "form_id": "new_scheme_request",
+      "form_version": 1,
+      "name": "New Scheme Request",
+      "frequency": "As needed",
+      "roles": [
+        "field_officer",
+        "dido"
+      ],
+      "sensitive": false,
+      "fields": [
+        {
+          "field_id": "temporary_client_id",
+          "type": "uuid",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "scheme_name",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "province",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "district",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "ward",
+          "type": "reference",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "scheme_gps",
+          "type": "point",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "scheme_photo",
+          "type": "photo",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "justification",
+          "type": "text",
+          "units": null,
+          "metadata": []
+        },
+        {
+          "field_id": "duplicate_candidates",
+          "type": "reference_list",
+          "units": null,
+          "metadata": []
+        }
+      ]
+    }
+  ]
+}
