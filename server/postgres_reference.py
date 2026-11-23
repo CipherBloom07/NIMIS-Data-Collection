@@ -69,7 +69,7 @@ def get_actor(user_id: str) -> dict[str, Any] | None:
     }
 
 
-def get_schemes(user_id: str, limit: int = 500, offset: int = 0) -> list[dict[str, Any]]:
+def get_schemes(user_id: str, limit: int = 100, after: str | None = None) -> list[dict[str, Any]]:
     with _connect() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
@@ -82,9 +82,10 @@ def get_schemes(user_id: str, limit: int = 500, offset: int = 0) -> list[dict[st
                       AND a.revoked_at IS NULL
                       AND u.active = true
                       AND s.is_fictional = true
+                      AND s.scheme_id > %s
                     ORDER BY s.scheme_id
-                    LIMIT %s OFFSET %s""",
-                (user_id, min(max(limit, 1), 500), max(offset, 0)),
+                    LIMIT %s""",
+                (user_id, after or "", min(max(limit, 1), 500) + 1),
             )
             rows = cursor.fetchall()
     return [
