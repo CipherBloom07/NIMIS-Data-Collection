@@ -10,3 +10,6 @@ coverage/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Locally generated isolated development database credentials
+server/postgres/.env.local
