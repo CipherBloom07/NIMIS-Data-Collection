@@ -1,0 +1,17 @@
+{
+  "name": "NIMIS Field Data Collection",
+  "short_name": "NIMIS Field",
+  "description": "Offline irrigation scheme data collection",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e7f4f4",
+  "theme_color": "#0a4e63",
+  "icons": [
+    {
+      "src": "/nimis-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
