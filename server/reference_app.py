@@ -127,6 +127,7 @@ def reference(actor: ActorDep, since: str | None = None):
     # A real adapter must provide the central reference data and access-controlled deltas.
     return _no_store(JSONResponse({
         "revision": "demo-1", "source": "FICTIONAL_DEVELOPMENT_DATA",
+        "reference_storage": "postgresql_demo" if postgres_reference.enabled() else "in_memory_demo",
         "generated_at": "2026-11-23T00:00:00+02:00",
         "provinces": actor.province_ids,
         "district_wards": {district: [] for district in actor.district_ids},
