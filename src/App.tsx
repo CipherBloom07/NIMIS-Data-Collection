@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Camera, Check, ClipboardList, CloudOff, Download, Droplets, FilePlus2, MapPin, Menu, Save, Wifi, WifiOff, X } from 'lucide-react';
 import { allFields, sections, type SurveyField } from './survey';
 import { listDrafts, listOutbox, loadPhoto, saveDraft, savePhoto, type Draft, type SurveyAnswers, type Answer } from './storage';
@@ -32,6 +32,9 @@ export default function App() {
   const [outboxCount, setOutboxCount] = useState(0);
   const [activeId, setActiveId] = useState<string | null | undefined>(undefined);
   const [answers, setAnswers] = useState<SurveyAnswers>(newValues);
+  const draftIdRef = useRef<string | null>(null);
+  const writeQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const [editSequence, setEditSequence] = useState(0);
   const [step, setStep] = useState(0);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -57,6 +60,8 @@ export default function App() {
   }
 
   function begin(draft?: Draft) {
+    draftIdRef.current = draft?.id ?? crypto.randomUUID();
+    setEditSequence(0);
     setActiveId(draft?.id ?? null);
     setAnswers(draft ? structuredClone(draft.answers) : newValues());
     setStep(0);
@@ -72,7 +77,28 @@ export default function App() {
       const value = answers[field.key];
       return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== '';
     }).length, [answers]);
-  const fill = (key: string, value: Answer) => setAnswers(previous => ({ ...previous, [key]: value }));
+  const fill = (key: string, value: Answer) => {
+    setAnswers(previous => ({ ...previous, [key]: value }));
+    setEditSequence(previous => previous + 1);
+  };
+
+  // The UI reads only IndexedDB snapshots; every changed field queues a
+  // durable write, serialized to preserve revision order even on slow devices.
+  useEffect(() => {
+    if (editSequence === 0 || activeId === undefined || !draftIdRef.current) return;
+    const currentId = draftIdRef.current;
+    const snapshot = structuredClone(answers);
+    writeQueueRef.current = writeQueueRef.current
+      .catch(() => {})
+      .then(() => saveDraft(currentId, snapshot))
+      .catch(error => { setNotice('Automatic local save failed: ' + String(error)); });
+  }, [editSequence]); // Deliberately snapshots the answers for this edit event.
+
+  async function exitEditor() {
+    await writeQueueRef.current;
+    setActiveId(undefined);
+    await refresh();
+  }
 
   async function save() {
     if (!getText(answers.scheme_name).trim()) {
@@ -90,7 +116,8 @@ export default function App() {
     if (busy) return;
     setBusy(true);
     try {
-      await saveDraft(activeId ?? null, answers);
+      await writeQueueRef.current;
+      await saveDraft(draftIdRef.current, answers);
       setActiveId(undefined);
       setNotice('Survey saved on this device. No data has been uploaded.');
       await refresh();
@@ -217,7 +244,7 @@ export default function App() {
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
       <div className="logo-row"><GovernmentEmblem/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
-      <button className={'nav-button ' + (!editing ? 'selected' : '')} onClick={() => { setActiveId(undefined); setMenuOpen(false); }}>
+      <button className={'nav-button ' + (!editing ? 'selected' : '')} onClick={() => { void exitEditor(); setMenuOpen(false); }}>
         <ClipboardList size={19}/> Survey dashboard
       </button>
       <button className="nav-button" onClick={() => begin()}><FilePlus2 size={19}/> New survey</button>
@@ -253,7 +280,7 @@ export default function App() {
           <div className="heading-row"><div><div className="overline">IRRIGATION SCHEME QUESTIONNAIRE</div>
             <h1>{activeId ? 'Edit survey' : 'New irrigation survey'}</h1>
             <p>Save as a draft whenever you need to. GPS and photos are kept on this device.</p></div>
-            <button className="secondary" onClick={() => setActiveId(undefined)}><ArrowLeft size={17}/> Dashboard</button></div>
+            <button className="secondary" onClick={() => void exitEditor()}><ArrowLeft size={17}/> Dashboard</button></div>
           <div className="survey-layout"><nav className="step-nav" aria-label="Survey sections">
             {sections.map((item,index) => <button className={index === step ? 'active' : ''} key={item.name} onClick={() => setStep(index)}>
               <span className="step-number">{index + 1}</span><span>{item.name}</span>{index < step && <Check size={15}/>}</button>)}
