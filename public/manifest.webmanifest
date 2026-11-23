@@ -8,10 +8,16 @@
   "theme_color": "#0a4e63",
   "icons": [
     {
-      "src": "/zimbabwe-coat-of-arms.svg",
+      "src": "/zimbabwe-coat-of-arms.jpg",
+      "sizes": "180x158",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/nimis-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
