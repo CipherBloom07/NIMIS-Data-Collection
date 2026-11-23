@@ -5,7 +5,7 @@ export type SurveyAnswers = Record<string, Answer>;
 export type Draft = { id: string; answers: SurveyAnswers; revision: number; updatedAt: string; status: 'local_pending' };
 export type OutboxEvent = { id: string; surveyId: string; revision: number; createdAt: string; schemaVersion: number; answers: SurveyAnswers };
 const DB_NAME = 'nimis_field_pwa_v1';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -15,6 +15,20 @@ export function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('drafts')) db.createObjectStore('drafts', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', { keyPath: 'surveyId' });
       if (!db.objectStoreNames.contains('photos')) db.createObjectStore('photos', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('operations')) {
+        db.createObjectStore('operations', { keyPath: 'id' });
+      }
+      // Preserve and migrate any old one-event-per-survey outbox entries.
+      if (db.objectStoreNames.contains('outbox')) {
+        const old = req.transaction!.objectStore('outbox');
+        const copy = old.getAll();
+        copy.onsuccess = () => {
+          const operations = req.transaction!.objectStore('operations');
+          for (const entry of copy.result as OutboxEvent[]) {
+            operations.put(entry);
+          }
+        };
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -36,8 +50,8 @@ export async function listOutbox(): Promise<OutboxEvent[]> {
   const db = await openDatabase();
   try {
     return await new Promise((resolve, reject) => {
-      const req = db.transaction('outbox', 'readonly').objectStore('outbox').getAll();
-      req.onsuccess = () => resolve(req.result as OutboxEvent[]);
+      const req = db.transaction('operations', 'readonly').objectStore('operations').getAll();
+      req.onsuccess = () => resolve((req.result as OutboxEvent[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.revision - b.revision));
       req.onerror = () => reject(req.error);
     });
   } finally { db.close(); }
@@ -48,7 +62,7 @@ export async function saveDraft(id: string | null, answers: SurveyAnswers): Prom
   const draftId = id ?? crypto.randomUUID();
   try {
     return await new Promise((resolve, reject) => {
-      const tx = db.transaction(['drafts','outbox'], 'readwrite');
+      const tx = db.transaction(['drafts','operations'], 'readwrite');
       let result: Draft | undefined;
       const get = tx.objectStore('drafts').get(draftId);
       get.onsuccess = () => {
@@ -59,8 +73,8 @@ export async function saveDraft(id: string | null, answers: SurveyAnswers): Prom
         const event: OutboxEvent = { id: draftId + ':' + revision, surveyId: draftId,
           revision, createdAt: updatedAt, schemaVersion, answers: structuredClone(answers) };
         tx.objectStore('drafts').put(result);
-        // Latest edit replaces the earlier unsent event atomically.
-        tx.objectStore('outbox').put(event);
+        // Immutable event: each local revision is retained until acknowledged.
+        tx.objectStore('operations').add(event);
       };
       get.onerror = () => reject(get.error);
       tx.oncomplete = () => resolve(result!);
