@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Camera, Check, ClipboardList, CloudOff, Download, Droplets, FilePlus2, MapPin, Menu, Save, Wifi, WifiOff, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Camera, Check, ClipboardList, CloudOff, Download, Droplets, FilePlus2, MapPin, Menu, Save, Wifi, WifiOff, X } from 'lucide-react';
 import { allFields, sections, type SurveyField } from './survey';
 import { countOperations, listDrafts, loadPhoto, saveDraft, savePhoto, type Draft, type SurveyAnswers, type Answer } from './storage';
 import './styles.css';
@@ -11,6 +11,7 @@ import DataTestPanel from './DataTestPanel';
 import WorkflowHome from './WorkflowHome';
 import HelpPanel from './HelpPanel';
 import StoragePanel from './StoragePanel';
+import { quickStorageRisk, type StorageRisk } from './storage-health';
 import './storage-panel.css';
 import './workflow.css';
 import './data-test.css';
@@ -34,6 +35,7 @@ export default function App() {
   const [dataTestView, setDataTestView] = useState(false);
   const [helpView, setHelpView] = useState(false);
   const [storageView, setStorageView] = useState(false);
+  const [storageRisk, setStorageRisk] = useState<StorageRisk>('unknown');
   const [photoPreviews, setPhotoPreviews] = useState<Record<string,string>>({});
   const draftIdRef = useRef<string | null>(null);
   const sessionRef = useRef(0);
@@ -53,6 +55,7 @@ export default function App() {
       const [items, pending] = await Promise.all([listDrafts(), countOperations()]);
       setDrafts(items);
       setOutboxCount(pending);
+      void quickStorageRisk().then(setStorageRisk);
     } catch (error) { setNotice('Local storage unavailable: ' + String(error)); }
   }
 
@@ -296,6 +299,7 @@ export default function App() {
       </header>
       <div className="content">
         {notice && <div role="status" className="notice"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice('')}><X size={16}/></button></div>}
+        {(storageRisk === 'warning' || storageRisk === 'critical') && <div className={'storage-risk storage-risk-' + storageRisk} role="alert"><AlertTriangle size={22}/><div><strong>{storageRisk === 'critical' ? 'Storage critically low' : 'Storage getting low'}</strong><p>New photos or surveys might fail to save. Preserve local records and check available space.</p></div><button type="button" className="secondary" onClick={() => void leaveForm('storage')}>Check storage</button></div>}
         {!editing ? (storageView ? <StoragePanel/> : helpView ? <HelpPanel/> : dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel onStartSurvey={() => void startNewSurvey()}/> : <>
           <div className="heading-row"><div><div className="overline">NIMIS / FIELD OPERATIONS</div><h1>Survey dashboard</h1><p>Capture reliable irrigation scheme information across Zimbabwe.</p></div>
           <button className="primary" onClick={() => begin()}><FilePlus2 size={18}/> New survey</button></div>
