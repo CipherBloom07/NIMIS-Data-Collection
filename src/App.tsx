@@ -5,6 +5,7 @@ import { listDrafts, listOutbox, loadPhoto, saveDraft, savePhoto, type Draft, ty
 import './styles.css';
 import './official-theme.css';
 import './responsive.css';
+import { validateBaseline } from './validation';
 
 function getText(value: Answer | undefined): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
@@ -48,6 +49,9 @@ export default function App() {
   }
 
   const section = sections[step];
+  const validation = useMemo(() => validateBaseline(answers), [answers]);
+  const errors = validation.filter(issue => issue.severity === 'error');
+  const warnings = validation.filter(issue => issue.severity === 'warning');
   const completed = useMemo(() =>
     allFields.filter(field => {
       const value = answers[field.key];
@@ -234,6 +238,9 @@ export default function App() {
               <h2>{section.name}</h2><p>{section.fields.length} fields in this section</p></div>
               <span className="progress-text">{completed}/{allFields.length} captured</span></div>
             <div className="progress"><div style={{width: ((completed / allFields.length)*100) + '%'}}/></div>
+            <div className="form-validation" aria-live="polite"><strong>Submission readiness:</strong> {errors.length} issues to resolve, {warnings.length} warnings. Drafts can be saved at any stage.
+              {(errors.length > 0 || warnings.length > 0) && <details><summary>Review validation details</summary><ul>{validation.slice(0, 15).map((issue, index) => <li key={issue.key + index} className={issue.severity}>{issue.message}</li>)}</ul></details>}
+            </div>
             <div className="form-grid">{section.fields.map(fieldUI)}</div>
             <div className="form-footer"><button className="secondary" disabled={step === 0} onClick={() => setStep(s => s-1)}><ArrowLeft size={16}/> Back</button>
               <div className="footer-right"><button className="secondary" disabled={busy} onClick={() => void save()}><Save size={16}/> Save draft</button>
