@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Camera, Check, ClipboardList, CloudOff, Download, Droplets, FilePlus2, MapPin, Menu, Save, Wifi, WifiOff, X } from 'lucide-react';
 import { allFields, sections, type SurveyField } from './survey';
 import { listDrafts, listOutbox, loadPhoto, saveDraft, savePhoto, type Draft, type SurveyAnswers, type Answer } from './storage';
@@ -22,6 +22,9 @@ export default function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [menuOpen, setMenuOpen] = useState(false);
   const [photoPreviews, setPhotoPreviews] = useState<Record<string,string>>({});
+  const draftIdRef = useRef<string | null>(null);
+  const sessionRef = useRef(0);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -41,6 +44,8 @@ export default function App() {
   }
 
   function begin(draft?: Draft) {
+    sessionRef.current += 1;
+    draftIdRef.current = draft?.id ?? null;
     setActiveId(draft?.id ?? null);
     setAnswers(draft ? structuredClone(draft.answers) : newValues());
     setStep(0);
@@ -59,18 +64,31 @@ export default function App() {
     }).length, [answers]);
   const fill = (key: string, value: Answer) => setAnswers(previous => ({ ...previous, [key]: value }));
 
+  // A draft may be incomplete. Validation is enforced later on submission.
+  useEffect(() => {
+    if (activeId === undefined || Object.keys(answers).length === 0) return;
+    const session = sessionRef.current;
+    const localId = draftIdRef.current ?? crypto.randomUUID();
+    draftIdRef.current = localId;
+    const snapshot = structuredClone(answers);
+    const timer = window.setTimeout(() => {
+      if (session !== sessionRef.current) return;
+      writeQueueRef.current = writeQueueRef.current.then(async () => {
+        await saveDraft(localId, snapshot);
+      }).catch(error => { setNotice('Autosave failed. Please keep this screen open and retry: ' + String(error)); });
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [answers, activeId]);
+
   async function save() {
-    if (!getText(answers.scheme_name).trim()) {
-      setNotice('Please enter the irrigation scheme name first.');
-      setStep(0);
-      return;
-    }
     if (busy) return;
     setBusy(true);
     try {
-      await saveDraft(activeId ?? null, answers);
+      await writeQueueRef.current;
+      await saveDraft(draftIdRef.current ?? activeId ?? null, answers);
+      sessionRef.current += 1;
       setActiveId(undefined);
-      setNotice('Survey saved on this device. No data has been uploaded.');
+      setNotice('Draft saved offline on this device. No data has been uploaded.');
       await refresh();
     } catch (error) { setNotice('Unable to save survey: ' + String(error)); }
     finally { setBusy(false); }
