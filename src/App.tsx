@@ -7,6 +7,7 @@ import './official-theme.css';
 import './responsive.css';
 import { validateBaseline } from './validation';
 import ReferencePanel from './ReferencePanel';
+import DataTestPanel from './DataTestPanel';
 import './reference.css';
 
 function getText(value: Answer | undefined): string {
@@ -24,6 +25,7 @@ export default function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [menuOpen, setMenuOpen] = useState(false);
   const [referenceView, setReferenceView] = useState(false);
+  const [dataTestView, setDataTestView] = useState(false);
   const [photoPreviews, setPhotoPreviews] = useState<Record<string,string>>({});
   const draftIdRef = useRef<string | null>(null);
   const sessionRef = useRef(0);
@@ -47,6 +49,7 @@ export default function App() {
   }
 
   function begin(draft?: Draft) {
+    setDataTestView(false);
     setReferenceView(false);
     sessionRef.current += 1;
     draftIdRef.current = draft?.id ?? null;
@@ -215,11 +218,12 @@ export default function App() {
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
       <div className="logo-row"><img src="/zimbabwe-coat-of-arms.jpg" alt="Zimbabwe national coat of arms"/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
-      <button className={'nav-button ' + (!editing && !referenceView ? 'selected' : '')} onClick={() => { setReferenceView(false); setActiveId(undefined); setMenuOpen(false); }}>
+      <button className={'nav-button ' + (!editing && !referenceView && !dataTestView ? 'selected' : '')} onClick={() => { setDataTestView(false); setReferenceView(false); setActiveId(undefined); setMenuOpen(false); }}>
         <ClipboardList size={19}/> Survey dashboard
       </button>
       <button className="nav-button" onClick={() => begin()}><FilePlus2 size={19}/> New survey</button>
-      <button className={'nav-button ' + (referenceView ? 'selected' : '')} onClick={() => { setActiveId(undefined); setReferenceView(true); setMenuOpen(false); }}><ClipboardList size={19}/> Assigned schemes</button>
+      <button className={'nav-button ' + (referenceView ? 'selected' : '')} onClick={() => { setDataTestView(false); setActiveId(undefined); setReferenceView(true); setMenuOpen(false); }}><ClipboardList size={19}/> Assigned schemes</button>
+      {import.meta.env.DEV && <button className={'nav-button ' + (dataTestView ? 'selected' : '')} onClick={() => { setActiveId(undefined); setReferenceView(false); setDataTestView(true); setMenuOpen(false); }}><ClipboardList size={19}/> Test fictional data</button>}
       <div className="aside-spacer"/>
       <div className="side-status"><CloudOff size={18}/><span>Local-only development build<br/><small>Server sync not connected</small></span></div>
     </aside>
@@ -232,7 +236,7 @@ export default function App() {
       </header>
       <div className="content">
         {notice && <div role="status" className="notice"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice('')}><X size={16}/></button></div>}
-        {!editing ? (referenceView ? <ReferencePanel/> : <>
+        {!editing ? (dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel/> : <>
           <div className="heading-row"><div><div className="overline">NIMIS / FIELD OPERATIONS</div><h1>Survey dashboard</h1><p>Capture reliable irrigation scheme information across Zimbabwe.</p></div>
           <button className="primary" onClick={() => begin()}><FilePlus2 size={18}/> New survey</button></div>
           <div className="metrics">
