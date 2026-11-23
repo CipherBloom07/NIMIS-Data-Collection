@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Camera, Check, ClipboardList, CloudOff, Download, Droplets, FilePlus2, MapPin, Menu, Save, Wifi, WifiOff, X } from 'lucide-react';
 import { allFields, sections, type SurveyField } from './survey';
 import { listDrafts, listOutbox, loadPhoto, saveDraft, savePhoto, type Draft, type SurveyAnswers, type Answer } from './storage';
+import { isFieldVisible, validateBaseline } from './validation';
 import './styles.css';
 import './official-theme.css';
 import './responsive.css';
@@ -10,6 +11,9 @@ function getText(value: Answer | undefined): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 }
 const newValues = (): SurveyAnswers => ({});
+function sectionFields(index: number, answers: SurveyAnswers) {
+  return sections[index].fields.filter(field => isFieldVisible(field, answers));
+}
 
 /** The supplied national coat of arms is embedded in an SVG, keeping it
  * available offline even if the original JPEG asset path was cached. */
@@ -60,6 +64,8 @@ export default function App() {
     setMenuOpen(false);
   }
 
+  const problems = useMemo(() => validateBaseline(answers, false), [answers]);
+  const visibleFields = sectionFields(step, answers);
   const section = sections[step];
   const completed = useMemo(() =>
     allFields.filter(field => {
@@ -72,6 +78,13 @@ export default function App() {
     if (!getText(answers.scheme_name).trim()) {
       setNotice('Please enter the irrigation scheme name first.');
       setStep(0);
+      return;
+    }
+    const blocking = validateBaseline(answers, false).filter(problem => problem.severity === 'error');
+    if (blocking.length) {
+      setNotice(blocking[0].message);
+      const sectionAt = sections.findIndex(section => section.fields.some(field => field.key === blocking[0].field));
+      if (sectionAt >= 0) setStep(sectionAt);
       return;
     }
     if (busy) return;
@@ -143,9 +156,11 @@ export default function App() {
 
   function fieldUI(field: SurveyField) {
     const value = answers[field.key];
+    const fieldProblems = problems.filter(problem => problem.field === field.key);
+    const hint = fieldProblems.length ? <span className={'field-feedback ' + fieldProblems[0].severity} role="status">{fieldProblems[0].message}</span> : null;
     if (field.type === 'select') return (
       <label className="field" key={field.key}><span>{field.label}</span>
-        <select value={getText(value)} onChange={event => fill(field.key, event.target.value)}>
+        {hint}<select value={getText(value)} onChange={event => fill(field.key, event.target.value)}>
           <option value="">Select an option</option>
           {field.options?.map(option => <option key={option} value={option}>{option}</option>)}
         </select>
@@ -244,10 +259,10 @@ export default function App() {
               <span className="step-number">{index + 1}</span><span>{item.name}</span>{index < step && <Check size={15}/>}</button>)}
           </nav><div className="panel survey-panel">
             <div className="form-header"><div><span className="overline">SECTION {step+1} OF {sections.length}</span>
-              <h2>{section.name}</h2><p>{section.fields.length} fields in this section</p></div>
+              <h2>{section.name}</h2><p>{visibleFields.length} relevant fields in this section</p></div>
               <span className="progress-text">{completed}/{allFields.length} captured</span></div>
             <div className="progress"><div style={{width: ((completed / allFields.length)*100) + '%'}}/></div>
-            <div className="form-grid">{section.fields.map(fieldUI)}</div>
+            <div className="form-grid">{visibleFields.map(fieldUI)}</div>
             <div className="form-footer"><button className="secondary" disabled={step === 0} onClick={() => setStep(s => s-1)}><ArrowLeft size={16}/> Back</button>
               <div className="footer-right"><button className="secondary" disabled={busy} onClick={() => void save()}><Save size={16}/> Save draft</button>
                 {step < sections.length - 1 ? <button className="primary" onClick={() => setStep(s => s+1)}>Next section <ArrowRight size={16}/></button> :
