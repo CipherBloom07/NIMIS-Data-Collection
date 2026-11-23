@@ -40,8 +40,8 @@ export default function WorkflowHome({ drafts, onStart, onSchemes, onResume }: P
           <span className="journey-number">1</span>
           <Database size={23} aria-hidden="true"/>
           <strong>Find your scheme</strong>
-          <span>View the assigned scheme register available for your account.</span>
-          <em>View schemes <ArrowRight size={15}/></em>
+          <span>Preview fictional scheme assignments. Official assignments are not connected yet.</span>
+          <em>View demo schemes <ArrowRight size={15}/></em>
         </button>
         <button type="button" className="journey-card" onClick={onStart}>
           <span className="journey-number">2</span>
