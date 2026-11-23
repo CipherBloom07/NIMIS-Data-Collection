@@ -2,8 +2,8 @@ import { schemaVersion } from './survey';
 
 export type Answer = string | string[] | number | null | { latitude: number; longitude: number; accuracy_m: number; captured_at: string };
 export type SurveyAnswers = Record<string, Answer>;
-export type Draft = { id: string; answers: SurveyAnswers; revision: number; updatedAt: string; status: 'local_pending' };
-export type OutboxEvent = { id: string; surveyId: string; revision: number; createdAt: string; schemaVersion: number; answers: SurveyAnswers };
+export type Draft = { id: string; formId?: string; formVersion?: number; answers: SurveyAnswers; revision: number; updatedAt: string; status: 'local_pending' };
+export type OutboxEvent = { id: string; surveyId: string; formId?: string; formVersion?: number; revision: number; createdAt: string; schemaVersion: number; answers: SurveyAnswers };
 const DB_NAME = 'nimis_field_pwa_v1';
 const DB_VERSION = 2;
 
@@ -69,9 +69,12 @@ export async function saveDraft(id: string | null, answers: SurveyAnswers): Prom
         const old = get.result as Draft | undefined;
         const revision = (old?.revision ?? 0) + 1;
         const updatedAt = new Date().toISOString();
-        result = { id: draftId, answers: structuredClone(answers), revision, updatedAt, status: 'local_pending' };
-        const event: OutboxEvent = { id: draftId + ':' + revision, surveyId: draftId,
-          revision, createdAt: updatedAt, schemaVersion, answers: structuredClone(answers) };
+        // Existing drafts remain pinned to the form version they started on.
+        const formId = old?.formId ?? 'scheme_baseline';
+        const formVersion = old?.formVersion ?? schemaVersion;
+        result = { id: draftId, formId, formVersion, answers: structuredClone(answers), revision, updatedAt, status: 'local_pending' };
+        const event: OutboxEvent = { id: draftId + ':' + revision, surveyId: draftId, formId, formVersion,
+          revision, createdAt: updatedAt, schemaVersion: formVersion, answers: structuredClone(answers) };
         tx.objectStore('drafts').put(result);
         // Immutable event: each local revision is retained until acknowledged.
         tx.objectStore('operations').add(event);
