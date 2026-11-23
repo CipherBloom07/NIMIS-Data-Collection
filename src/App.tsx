@@ -9,6 +9,7 @@ import { validateBaseline } from './validation';
 import ReferencePanel from './ReferencePanel';
 import DataTestPanel from './DataTestPanel';
 import WorkflowHome from './WorkflowHome';
+import HelpPanel from './HelpPanel';
 import './workflow.css';
 import './data-test.css';
 import './reference.css';
@@ -29,6 +30,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [referenceView, setReferenceView] = useState(false);
   const [dataTestView, setDataTestView] = useState(false);
+  const [helpView, setHelpView] = useState(false);
   const [photoPreviews, setPhotoPreviews] = useState<Record<string,string>>({});
   const draftIdRef = useRef<string | null>(null);
   const sessionRef = useRef(0);
@@ -53,6 +55,7 @@ export default function App() {
 
   function begin(draft?: Draft) {
     setDataTestView(false);
+    setHelpView(false);
     setReferenceView(false);
     sessionRef.current += 1;
     draftIdRef.current = draft?.id ?? null;
@@ -94,7 +97,7 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [answers, activeId]);
 
-  async function leaveForm(destination: 'dashboard' | 'schemes' | 'test') {
+  async function leaveForm(destination: 'dashboard' | 'schemes' | 'test' | 'help') {
     if (busy) return;
     setBusy(true);
     try {
@@ -108,6 +111,7 @@ export default function App() {
       setActiveId(undefined);
       setReferenceView(destination === 'schemes');
       setDataTestView(destination === 'test');
+      setHelpView(destination === 'help');
       setMenuOpen(false);
       await refresh();
       if (activeId !== undefined && Object.keys(answers).length > 0) {
@@ -266,12 +270,13 @@ export default function App() {
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
       <div className="logo-row"><img src="/zimbabwe-coat-of-arms.jpg" alt="Zimbabwe national coat of arms"/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
-      <button className={'nav-button ' + (!editing && !referenceView && !dataTestView ? 'selected' : '')} onClick={() => void leaveForm('dashboard')}>
+      <button className={'nav-button ' + (!editing && !referenceView && !dataTestView && !helpView ? 'selected' : '')} onClick={() => void leaveForm('dashboard')}>
         <ClipboardList size={19}/> Survey dashboard
       </button>
       <button className="nav-button" onClick={() => void startNewSurvey()}><FilePlus2 size={19}/> New survey</button>
       <button className={'nav-button ' + (referenceView ? 'selected' : '')} onClick={() => void leaveForm('schemes')}><ClipboardList size={19}/> Assigned schemes</button>
       {import.meta.env.DEV && <button className={'nav-button ' + (dataTestView ? 'selected' : '')} onClick={() => void leaveForm('test')}><ClipboardList size={19}/> Test fictional data</button>}
+      <button className={'nav-button ' + (helpView ? 'selected' : '')} onClick={() => void leaveForm('help')}><ClipboardList size={19}/> How to use this app</button>
       <div className="aside-spacer"/>
       <div className="side-status"><CloudOff size={18}/><span>Local-only development build<br/><small>Server sync not connected</small></span></div>
     </aside>
@@ -284,7 +289,7 @@ export default function App() {
       </header>
       <div className="content">
         {notice && <div role="status" className="notice"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice('')}><X size={16}/></button></div>}
-        {!editing ? (dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel/> : <>
+        {!editing ? (helpView ? <HelpPanel/> : dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel/> : <>
           <div className="heading-row"><div><div className="overline">NIMIS / FIELD OPERATIONS</div><h1>Survey dashboard</h1><p>Capture reliable irrigation scheme information across Zimbabwe.</p></div>
           <button className="primary" onClick={() => begin()}><FilePlus2 size={18}/> New survey</button></div>
           <WorkflowHome drafts={drafts} onStart={() => void startNewSurvey()} onSchemes={() => void leaveForm('schemes')} onResume={begin}/>
