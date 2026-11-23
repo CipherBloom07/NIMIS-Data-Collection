@@ -1,0 +1,24 @@
+name: Flutter clean start checks
+on:
+  push:
+    branches: [main, feat/v2-clean-flutter-start]
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Flutter platform files
+        run: flutter create --platforms android --project-name nimis_field_collector .
+      - name: Remove generated template test
+        run: rm -f test/widget_test.dart
+      - name: Download dependencies
+        run: flutter pub get
+      - name: Analyze Dart sources
+        run: flutter analyze
+      - name: Run tests
+        run: flutter test
