@@ -24,11 +24,11 @@ const base: SurveyAnswers = {
 export const demoCases: DemoCase[] = [
   { id: 'DEMO-VALID', label: 'Valid fictional baseline', expectedErrors: 0, expectedWarnings: 0,
     answers: { ...base } },
-  { id: 'DEMO-INVALID', label: 'Invalid area and out-of-country GPS', expectedErrors: 2, expectedWarnings: 0,
+  { id: 'DEMO-INVALID', label: 'Invalid area and out-of-country GPS', expectedErrors: 3, expectedWarnings: 1,
     answers: { ...base, scheme_name: '[TEST ONLY] Invalid Scheme',
       equipped_area_ha: -4, functional_area_ha: -2,
       scheme_gps: { latitude: -10, longitude: 39, accuracy_m: 8, captured_at: '2026-11-23T10:00:00+02:00' } } },
-  { id: 'DEMO-WARNING', label: 'Area consistency warning', expectedErrors: 0, expectedWarnings: 2,
+  { id: 'DEMO-WARNING', label: 'Area consistency warning', expectedErrors: 0, expectedWarnings: 1,
     answers: { ...base, scheme_name: '[TEST ONLY] Area Discrepancy',
       equipped_area_ha: 50, functional_area_ha: 65, scheme_status: 'Fully functional' } },
 ];
