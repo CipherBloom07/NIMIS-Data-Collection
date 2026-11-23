@@ -107,8 +107,14 @@ if (-not (Test-Path -LiteralPath (Join-Path $Data 'PG_VERSION'))) {
     }
     Write-Host 'DATABASE_INITIALIZED: PASS' -ForegroundColor Green
 }
-$Status = (& $Ctl -D $Data status 2>&1 | Out-String)
-$IsRunning = ($LASTEXITCODE -eq 0)
+# pg_ctl status returns exit code 3 on a fresh unstarted cluster.
+# Avoid treating this expected condition as a PowerShell terminating error.
+$PreviousErrorPolicy = $ErrorActionPreference
+try {
+    $ErrorActionPreference = 'Continue'
+    & $Ctl -D $Data status 2>$null | Out-Null
+    $IsRunning = ($LASTEXITCODE -eq 0)
+} finally { $ErrorActionPreference = $PreviousErrorPolicy }
 if (-not $IsRunning) {
     if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
         throw 'PORT_55432_ALREADY_IN_USE'
