@@ -51,3 +51,38 @@ def test_test_tokens_disabled_by_default(monkeypatch):
 def token_value():
     # Invalid token for negative coverage.
     return "not-a-jwt"
+
+def test_role_is_loaded_server_side_not_from_token_claim():
+    import jwt
+    from server.reference_app import DEMO_USER_ID, ISSUER, AUDIENCE
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    claims = {
+        "sub": DEMO_USER_ID, "iss": ISSUER, "aud": AUDIENCE,
+        "iat": now, "exp": now + timedelta(minutes=2),
+        "role": "administrator",
+        "province_ids": ["ALL"],
+        "scheme_ids": ["NOT-ASSIGNED"],
+    }
+    forged_roles = jwt.encode(
+        claims, os.environ["NIMIS_DEV_JWT_SECRET"], algorithm="HS256",
+    )
+    response = client.get(
+        "/api/v1/me", headers={"Authorization": "Bearer " + forged_roles},
+    )
+    assert response.status_code == 200
+    assert response.json()["role"] == "field_officer"
+    assert response.json()["scheme_ids"] == ["DEMO-SCHEME-001"]
+
+
+def test_wrong_audience_and_expired_token_rejected():
+    import jwt
+    from server.reference_app import DEMO_USER_ID, ISSUER
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    for claims in (
+        {"sub": DEMO_USER_ID, "iss": ISSUER, "aud": "wrong-audience", "iat": now, "exp": now + timedelta(minutes=2)},
+        {"sub": DEMO_USER_ID, "iss": ISSUER, "aud": "nimis-collect-reference-client", "iat": now - timedelta(hours=2), "exp": now - timedelta(hours=1)},
+    ):
+        fake = jwt.encode(claims, os.environ["NIMIS_DEV_JWT_SECRET"], algorithm="HS256")
+        assert client.get("/api/v1/me", headers={"Authorization": "Bearer " + fake}).status_code == 401
