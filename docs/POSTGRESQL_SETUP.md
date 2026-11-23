@@ -1,3 +1,5 @@
+> **Windows project-local mode is now the default (no Docker required).** Follow [PORTABLE_POSTGRESQL_WINDOWS.md](PORTABLE_POSTGRESQL_WINDOWS.md) and run `scripts/START_POSTGRES_DEMO.ps1`. The Docker instructions below remain an **optional** alternative via `scripts/START_POSTGRES_DOCKER.ps1`.
+
 # PostgreSQL + PostGIS architecture for NIMIS Collect
 
 ## What is actually implemented
