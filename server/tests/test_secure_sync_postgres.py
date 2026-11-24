@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from server.reference_app import app
-from server import secure_sync
+from server import secure_sync, secure_review
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -38,8 +38,10 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
     # This disposable test creates the ICT-supplied view ONLY in the throwaway
     # CI database. The staging migration does not create any scope source.
     ddl = Path("server/postgres/005_secure_sync_foundation_REVIEW.sql").read_text(encoding="utf-8")
+    review_ddl = Path("server/postgres/006_district_review_REVIEW.sql").read_text(encoding="utf-8")
     with psycopg.connect(url, autocommit=True) as conn:
         conn.execute(ddl)
+        conn.execute(review_ddl)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS nimis_sync.test_actor_scope (
                  user_id uuid NOT NULL, scheme_id text NOT NULL, role text NOT NULL,
@@ -73,11 +75,11 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
         app.dependency_overrides[secure_sync._actor] = lambda: actor
         return original
 
-    monkeypatch.setattr(
-        secure_sync, "_config",
-        lambda: ("https://ci.example.invalid/", "test-api",
-                 "https://ci.example.invalid/jwks.json", url),
-    )
+    def isolated_configuration():
+        return ("https://ci.example.invalid/", "test-api",
+                "https://ci.example.invalid/jwks.json", url)
+    monkeypatch.setattr(secure_sync, "_config", isolated_configuration)
+    monkeypatch.setattr(secure_review, "_config", isolated_configuration)
     client = TestClient(app)
 
     try:
@@ -146,6 +148,22 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
             assert inbox.status_code == 200, inbox.text
             assert [i["event_id"] for i in inbox.json()["items"]
                     if i["event_id"] == str(event_id)] == [str(event_id)]
+            decision_id = uuid4()
+            endpoint = f"/api/v1/secure/district/submissions/{event_id}/decisions"
+            approved = client.post(endpoint, json={
+                "decision_id": str(decision_id), "action": "VERIFY", "reason": ""})
+            assert approved.status_code == 200, approved.text
+            assert approved.json()["status"] == "VERIFIED"
+            duplicate_decision = client.post(endpoint, json={
+                "decision_id": str(decision_id), "action": "VERIFY", "reason": ""})
+            assert duplicate_decision.status_code == 200, duplicate_decision.text
+            assert duplicate_decision.json()["outcome"] == "duplicate"
+            forbidden_second_decision = client.post(endpoint, json={
+                "decision_id": str(uuid4()), "action": "RETURN", "reason": "late review"})
+            assert forbidden_second_decision.status_code == 409
+            inbox_after = client.get("/api/v1/secure/district/inbox")
+            assert next(i for i in inbox_after.json()["items"]
+                        if i["event_id"] == str(event_id))["status"] == "VERIFIED"
         finally:
             app.dependency_overrides.clear()
             app.dependency_overrides.update(original)
@@ -155,6 +173,10 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
             empty = client.get("/api/v1/secure/district/inbox")
             assert empty.status_code == 200, empty.text
             assert not any(i["event_id"] == str(event_id) for i in empty.json()["items"])
+            forbidden = client.post(
+                f"/api/v1/secure/district/submissions/{event_id}/decisions",
+                json={"decision_id": str(uuid4()), "action": "VERIFY"})
+            assert forbidden.status_code == 403
         finally:
             app.dependency_overrides.clear()
             app.dependency_overrides.update(original)
@@ -172,6 +194,31 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
             ))
         assert outcomes.count("accepted") == 1
         assert outcomes.count("duplicate") == 5
+
+        # Two authorized reviewers racing the same record must not both succeed.
+        from server.secure_review import DistrictDecision, decide_district
+        from fastapi import HTTPException
+        competing = [
+            DistrictDecision(decision_id=uuid4(), action="VERIFY"),
+            DistrictDecision(decision_id=uuid4(), action="RETURN",
+                             reason="Incomplete irrigation inspection"),
+        ]
+        def race(decision):
+            try:
+                return decide_district(concurrent_event, decision, actor=district)["outcome"]
+            except HTTPException as error:
+                return error.status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            review_results = list(pool.map(race, competing))
+        assert review_results.count("accepted") == 1
+        assert review_results.count(409) == 1
+
+        with psycopg.connect(url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT count(*) FROM nimis_sync.review_decision
+                       WHERE event_id=%s""", (concurrent_event,))
+                assert cur.fetchone()[0] == 1
 
         with psycopg.connect(url) as conn:
             conn.execute(
@@ -193,6 +240,16 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
         # Test data only. Keep schema for the remaining isolated tests.
         with psycopg.connect(url) as conn:
             with conn.cursor() as cur:
+                cur.execute(
+                    """DELETE FROM nimis_sync.review_decision
+                       WHERE event_id IN (SELECT event_id FROM nimis_sync.operation WHERE device_id=%s)""",
+                    (device,),
+                )
+                cur.execute(
+                    """DELETE FROM nimis_sync.review_state
+                       WHERE event_id IN (SELECT event_id FROM nimis_sync.operation WHERE device_id=%s)""",
+                    (device,),
+                )
                 cur.execute("DELETE FROM nimis_sync.operation WHERE device_id=%s", (device,))
                 cur.execute("DELETE FROM nimis_sync.test_actor_scope WHERE user_id=ANY(%s)",
                             ([collector, district, outsider],))

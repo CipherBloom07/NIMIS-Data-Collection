@@ -198,6 +198,33 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '503': { $ref: '#/components/responses/Problem' }
+  /secure/district/submissions/{event_id}/decisions:
+    post:
+      summary: Staging-only idempotent district verification or return
+      description: Requires a signed district officer identity and an active assignment for the submitted scheme; self-review is denied. No national master record is modified.
+      operationId: stagingDistrictDecision
+      parameters:
+        - { in: path, name: event_id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision_id, action]
+              properties:
+                decision_id: { type: string, format: uuid }
+                action: { type: string, enum: [VERIFY, RETURN] }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200': { description: Committed decision or exact idempotent retry }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
   /secure/district/inbox:
     get:
       summary: Metadata-only staging district submissions visible to authenticated, scheme-scoped district officer
