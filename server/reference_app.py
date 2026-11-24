@@ -26,6 +26,8 @@ AUDIENCE = "nimis-collect-reference-client"
 DEMO_USER_ID = "10000000-0000-4000-8000-000000000001"
 DEMO_SCHEME_ID = "DEMO-SCHEME-001"
 DEMO_DISTRICT_USER_ID = "10000000-0000-4000-8000-000000000002"
+DEMO_PROVINCIAL_USER_ID = "10000000-0000-4000-8000-000000000003"
+DEMO_ADMIN_USER_ID = "10000000-0000-4000-8000-000000000004"
 
 app = FastAPI(
     title="NIMIS Collect — Reference Access/Reference API",
@@ -81,6 +83,14 @@ def _actors() -> dict[str, Actor]:
         province_ids=["DEMO-PROVINCE"],
         district_ids=["DEMO-DISTRICT"],
         scheme_ids=[DEMO_SCHEME_ID],
+    ), DEMO_PROVINCIAL_USER_ID: Actor(
+        user_id=DEMO_PROVINCIAL_USER_ID,
+        role="provincial_officer", province_ids=["DEMO-PROVINCE"],
+        district_ids=["DEMO-DISTRICT"], scheme_ids=[DEMO_SCHEME_ID],
+    ), DEMO_ADMIN_USER_ID: Actor(
+        user_id=DEMO_ADMIN_USER_ID,
+        role="admin", province_ids=["DEMO-PROVINCE"],
+        district_ids=["DEMO-DISTRICT"], scheme_ids=[DEMO_SCHEME_ID],
     )}
 
 def current_actor(authorization: Annotated[str | None, Header()] = None) -> Actor:
@@ -124,9 +134,15 @@ def health():
 def development_token(credentials: DemoTokenRequest, request: Request):
     if not _demo_enabled() or not _loopback(request):
         raise HTTPException(status_code=404, detail="Unavailable")
-    if credentials.username not in ("officer.demo", "district.demo"):
+    subjects = {
+        "officer.demo": DEMO_USER_ID,
+        "district.demo": DEMO_DISTRICT_USER_ID,
+        "provincial.demo": DEMO_PROVINCIAL_USER_ID,
+        "admin.demo": DEMO_ADMIN_USER_ID,
+    }
+    subject = subjects.get(credentials.username)
+    if subject is None:
         raise HTTPException(status_code=401, detail="Unknown demo account")
-    subject = DEMO_USER_ID if credentials.username == "officer.demo" else DEMO_DISTRICT_USER_ID
     now = datetime.now(timezone.utc)
     access_token = jwt.encode(
         {"sub": subject, "iss": ISSUER, "aud": AUDIENCE,
@@ -211,3 +227,6 @@ def unavailable_writes(submission_id: str | None = None):
 # Experimental local-only Collector -> District demonstration. Never enable on production.
 from server.demo_integration import router as demo_integration_router
 app.include_router(demo_integration_router)
+
+from server.demo_review_stages import router as demo_review_router
+app.include_router(demo_review_router)
