@@ -159,6 +159,20 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
             app.dependency_overrides.clear()
             app.dependency_overrides.update(original)
 
+        # Simultaneous retry requests must collapse to one immutable server row.
+        # This uses the same canonical event UUID and device-wide sequence.
+        from concurrent.futures import ThreadPoolExecutor
+        concurrent_event = uuid4()
+        identical = secure_sync.Operation.model_validate(
+            payload(event=concurrent_event, sequence=5))
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            outcomes = list(pool.map(
+                lambda _: secure_sync._accept_one(url, collector, identical)["outcome"],
+                range(6),
+            ))
+        assert outcomes.count("accepted") == 1
+        assert outcomes.count("duplicate") == 5
+
         with psycopg.connect(url) as conn:
             conn.execute(
                 """UPDATE nimis_sync.enrolled_device SET revoked_at=now()
