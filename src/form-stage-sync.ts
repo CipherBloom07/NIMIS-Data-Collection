@@ -19,7 +19,7 @@ type Payload = {
 export type StageQueueItem = {
   id:string;record_id:string;revision:number;created_at:string;
   status:'pending'|'synced'|'attention';payload:Payload;
-  server_status?:string;reason?:string;
+  server_status?:string;reason?:string;last_attempt_at?:string;
 };
 const DB='nimis_requirements_drafts_v1',QUEUE='queue',VERSION=2;
 const BASE='http://127.0.0.1:8775/api/v1/stage/forms';
@@ -173,19 +173,32 @@ export async function syncQueuedForms():Promise<{synced:number;remaining:number;
           headers:{...collectorAuthorizationHeaders(),'Content-Type':'application/json'},
           body:JSON.stringify({operations:[row.payload]}),
         });
-      }catch{
-        // A network failure is not a rejection or acknowledgement.
+      }catch(error){
+        // Retain the exact event ID and payload; network failures are never
+        // interpreted as accepted, rejected or acknowledged submissions.
+        await putQueue({...row,status:'pending',last_attempt_at:new Date().toISOString(),
+          reason:'Connection unavailable: '+(error instanceof Error?error.message:'retry on reconnect')});
         break;
       }
-      if(!response.ok)break;
+      if(!response.ok){
+        await putQueue({...row,status:'pending',last_attempt_at:new Date().toISOString(),
+          reason:'Server unavailable or authentication required (HTTP '+response.status+')'});
+        break;
+      }
       const json=await response.json().catch(()=>null);
       const ack=json?.source==='ISOLATED_DEVELOPMENT'?json.results?.[0]:null;
-      if(!ack||ack.event_id!==row.payload.event_id)break;
+      if(!ack||ack.event_id!==row.payload.event_id){
+        await putQueue({...row,status:'pending',last_attempt_at:new Date().toISOString(),
+          reason:'No verified acknowledgement received; original event retained'});
+        break;
+      }
       if(ack.outcome==='accepted'||ack.outcome==='duplicate'){
-        await putQueue({...row,status:'synced',server_status:ack.status??'STAGED',reason:undefined});
+        await putQueue({...row,status:'synced',server_status:ack.status??'STAGED',
+          last_attempt_at:new Date().toISOString(),reason:undefined});
         synced++;
       }else if(ack.outcome==='conflict'||ack.outcome==='rejected'){
-        await putQueue({...row,status:'attention',reason:String(ack.reason??ack.outcome)});
+        await putQueue({...row,status:'attention',last_attempt_at:new Date().toISOString(),
+          reason:String(ack.reason??ack.outcome)});
       }else break;
     }
     const current=await listFormQueue();
