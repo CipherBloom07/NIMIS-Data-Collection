@@ -1,7 +1,7 @@
 name: NIMIS PWA validation
 on:
   push:
-    branches: [main, feat/offline-pwa-foundation, feat/official-readiness-identity-v1, feat/collector-correction-ux-v1]
+    branches: [main, feat/offline-pwa-foundation, feat/official-readiness-identity-v1, feat/collector-correction-ux-v1, feat/collector-quality-demo-v1, feat/security-hardening-pilot-v1, feat/presentation-collector-sync-v1]
   pull_request:
 jobs:
   build:
@@ -22,6 +22,20 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - name: Validate local PowerShell launch syntax
+        shell: pwsh
+        run: |
+          $scripts = @('scripts/START_POSTGRES_LOCAL.ps1', 'scripts/START_CONNECTED_COLLECTOR_PILOT.ps1')
+          foreach ($path in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path,[ref]$tokens,[ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              foreach ($parseError in $errors) { Write-Error "$path : $parseError" }
+              throw "PowerShell syntax validation failed: $path"
+            }
+            Write-Host "POWERSHELL_PARSE_PASS: $path"
+          }
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

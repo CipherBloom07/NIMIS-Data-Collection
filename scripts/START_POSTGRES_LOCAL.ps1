@@ -84,12 +84,16 @@ if (-not (Test-Path -LiteralPath $Secrets)) {
 }
 $Values = @{}
 foreach ($Line in Get-Content -LiteralPath $Secrets) {
-    if ($Line -match '^([A-Z_]+)=(.+)
-if ($Values['NIMIS_PG_ADMIN_PASSWORD'] -notmatch '^[a-f0-9]{64}$' -or
+    if ($Line -match '^([A-Z_]+)=(.+)$') {
+        $Values[$Matches[1]] = $Matches[2]
+    }
+}
+if (-not $Values.ContainsKey('NIMIS_PG_ADMIN_PASSWORD') -or
+    -not $Values.ContainsKey('NIMIS_PG_PASSWORD') -or
+    $Values['NIMIS_PG_ADMIN_PASSWORD'] -notmatch '^[a-f0-9]{64}$' -or
     $Values['NIMIS_PG_PASSWORD'] -notmatch '^[a-f0-9]{64}$') {
     throw 'LOCAL_SECRETS_INVALID: Do not overwrite credentials for an existing database.'
 }
-
 if (-not (Test-Path -LiteralPath (Join-Path $Data 'PG_VERSION'))) {
     if (Test-Path -LiteralPath $Data) {
         if (@(Get-ChildItem -LiteralPath $Data -Force).Count -gt 0) {
@@ -164,188 +168,6 @@ if ($LASTEXITCODE -ne 0) { throw 'POSTGRES_DRIVER_INSTALL_FAILED' }
 
 $env:NIMIS_COLLECT_DATABASE_URL = "postgresql://nimis_demo:$($Values['NIMIS_PG_PASSWORD'])@127.0.0.1:55432/nimis_collect_dev"
 $env:NIMIS_COLLECT_SYNC_DATABASE_URL = "postgresql://nimis_sync_demo:$($Values['NIMIS_PG_SYNC_PASSWORD'])@127.0.0.1:55432/nimis_collect_dev"
-$env:NIMIS_POSTGRES_DEMO_MODE = '1'
-$env:NIMIS_DEMO_MODE = '1'
-Write-Host 'POSTGRES_STORAGE: database\data' -ForegroundColor Green
-if ($SetupOnly) {
-    Write-Host 'SETUP_ONLY: PASS — API not started' -ForegroundColor Green
-    return
-}
-if (Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue) {
-    throw 'API_PORT_8765_IN_USE: Stop the earlier FastAPI terminal with Ctrl+C.'
-}
-& (Join-Path $Project 'scripts\START_PHASE2_REFERENCE.ps1')
-) { $Values[$Matches[1]] = $Matches[2] }
-}
-# Preserve existing database credentials and generate only the missing demo sync password.
-if (-not $Values.ContainsKey('NIMIS_PG_SYNC_PASSWORD')) {
-    $SyncPassword = New-RandomSecret
-    Add-Content -LiteralPath $Secrets -Encoding ASCII -Value "NIMIS_PG_SYNC_PASSWORD=$SyncPassword"
-    $Values['NIMIS_PG_SYNC_PASSWORD'] = $SyncPassword
-}
-if ($Values['NIMIS_PG_SYNC_PASSWORD'] -notmatch '^[a-f0-9]{64}
-if ($Values['NIMIS_PG_ADMIN_PASSWORD'] -notmatch '^[a-f0-9]{64}$' -or
-    $Values['NIMIS_PG_PASSWORD'] -notmatch '^[a-f0-9]{64}$') {
-    throw 'LOCAL_SECRETS_INVALID: Do not overwrite credentials for an existing database.'
-}
-
-if (-not (Test-Path -LiteralPath (Join-Path $Data 'PG_VERSION'))) {
-    if (Test-Path -LiteralPath $Data) {
-        if (@(Get-ChildItem -LiteralPath $Data -Force).Count -gt 0) {
-            throw 'DATA_DIRECTORY_NOT_EMPTY: nothing deleted'
-        }
-    } else { New-Item -ItemType Directory -Path $Data | Out-Null }
-    $PasswordFile = Join-Path $Root '.init-password.tmp'
-    try {
-        Set-Content -LiteralPath $PasswordFile -Value $Values['NIMIS_PG_ADMIN_PASSWORD'] -Encoding ASCII
-        & $Init -D $Data -U postgres -E UTF8 --auth-local=scram-sha-256 --auth-host=scram-sha-256 "--pwfile=$PasswordFile"
-        if ($LASTEXITCODE -ne 0) { throw 'INITDB_FAILED' }
-    } finally {
-        if (Test-Path -LiteralPath $PasswordFile) { Remove-Item -LiteralPath $PasswordFile -Force }
-    }
-    Write-Host 'DATABASE_INITIALIZED: PASS' -ForegroundColor Green
-}
-# pg_ctl status returns exit code 3 on a fresh unstarted cluster.
-# Avoid treating this expected condition as a PowerShell terminating error.
-$PreviousErrorPolicy = $ErrorActionPreference
-try {
-    $ErrorActionPreference = 'Continue'
-    & $Ctl -D $Data status 2>$null | Out-Null
-    $IsRunning = ($LASTEXITCODE -eq 0)
-} finally { $ErrorActionPreference = $PreviousErrorPolicy }
-if (-not $IsRunning) {
-    if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
-        throw 'PORT_55432_ALREADY_IN_USE'
-    }
-    & $Ctl -D $Data -l (Join-Path $Logs 'postgres.log') -o '-h 127.0.0.1 -p 55432' -w -t 60 start
-    if ($LASTEXITCODE -ne 0) { throw 'LOCAL_POSTGRES_START_FAILED: Check database\logs\postgres.log' }
-}
-Write-Host 'LOCAL_POSTGRES_RUNNING: 127.0.0.1:55432' -ForegroundColor Green
-
-$OldPassword = $env:PGPASSWORD
-$OldHost = $env:PGHOST
-$OldPort = $env:PGPORT
-try {
-    $env:PGPASSWORD = $Values['NIMIS_PG_ADMIN_PASSWORD']
-    $env:PGHOST = '127.0.0.1'
-    $env:PGPORT = '55432'
-    & $Psql -X -w -U postgres -d postgres -v ON_ERROR_STOP=1 -t -A -c "SELECT current_setting('port')"
-    if ($LASTEXITCODE -ne 0) { throw 'LOCAL_POSTGRES_AUTHENTICATION_FAILED' }
-    $Exists = (& $Psql -X -w -U postgres -d postgres -v ON_ERROR_STOP=1 -t -A -c "SELECT 1 FROM pg_database WHERE datname='nimis_collect_dev'" | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0) { throw 'DATABASE_LOOKUP_FAILED' }
-    if ($Exists -ne '1') {
-        & $Psql -X -w -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE nimis_collect_dev'
-        if ($LASTEXITCODE -ne 0) { throw 'DATABASE_CREATE_FAILED' }
-    }
-    & $Psql -X -w -U postgres -d nimis_collect_dev -v ON_ERROR_STOP=1 -f (Join-Path $Project 'server\postgres\001_dev_reference.sql')
-    if ($LASTEXITCODE -ne 0) { throw 'REFERENCE_MIGRATION_FAILED' }
-    & $Psql -X -w -U postgres -d nimis_collect_dev -v ON_ERROR_STOP=1 -v "app_password=$($Values['NIMIS_PG_PASSWORD'])" -f (Join-Path $Project 'server\postgres\002_local_readonly_role.sql')
-    if ($LASTEXITCODE -ne 0) { throw 'READ_ONLY_ROLE_FAILED' }
-} finally {
-    $env:PGPASSWORD = $OldPassword
-    $env:PGHOST = $OldHost
-    $env:PGPORT = $OldPort
-}
-Write-Host 'FICTIONAL_SCHEME_DATABASE: READY' -ForegroundColor Green
-Write-Host 'API_ACCOUNT: READ_ONLY' -ForegroundColor Green
-
-$Python = Join-Path $Project '.venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $Python)) {
-    & python -m venv '.venv'
-    if ($LASTEXITCODE -ne 0) { throw 'VENV_FAILED' }
-}
-& $Python -m pip install --index-url https://pypi.org/simple --timeout 90 --retries 6 --disable-pip-version-check -r 'server\requirements-postgres.txt'
-if ($LASTEXITCODE -ne 0) { throw 'POSTGRES_DRIVER_INSTALL_FAILED' }
-
-$env:NIMIS_COLLECT_DATABASE_URL = "postgresql://nimis_demo:$($Values['NIMIS_PG_PASSWORD'])@127.0.0.1:55432/nimis_collect_dev"
-$env:NIMIS_POSTGRES_DEMO_MODE = '1'
-$env:NIMIS_DEMO_MODE = '1'
-Write-Host 'POSTGRES_STORAGE: database\data' -ForegroundColor Green
-if ($SetupOnly) {
-    Write-Host 'SETUP_ONLY: PASS — API not started' -ForegroundColor Green
-    return
-}
-if (Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue) {
-    throw 'API_PORT_8765_IN_USE: Stop the earlier FastAPI terminal with Ctrl+C.'
-}
-& (Join-Path $Project 'scripts\START_PHASE2_REFERENCE.ps1')
-) {
-    throw 'LOCAL_SYNC_PASSWORD_INVALID'
-}
-if ($Values['NIMIS_PG_ADMIN_PASSWORD'] -notmatch '^[a-f0-9]{64}$' -or
-    $Values['NIMIS_PG_PASSWORD'] -notmatch '^[a-f0-9]{64}$') {
-    throw 'LOCAL_SECRETS_INVALID: Do not overwrite credentials for an existing database.'
-}
-
-if (-not (Test-Path -LiteralPath (Join-Path $Data 'PG_VERSION'))) {
-    if (Test-Path -LiteralPath $Data) {
-        if (@(Get-ChildItem -LiteralPath $Data -Force).Count -gt 0) {
-            throw 'DATA_DIRECTORY_NOT_EMPTY: nothing deleted'
-        }
-    } else { New-Item -ItemType Directory -Path $Data | Out-Null }
-    $PasswordFile = Join-Path $Root '.init-password.tmp'
-    try {
-        Set-Content -LiteralPath $PasswordFile -Value $Values['NIMIS_PG_ADMIN_PASSWORD'] -Encoding ASCII
-        & $Init -D $Data -U postgres -E UTF8 --auth-local=scram-sha-256 --auth-host=scram-sha-256 "--pwfile=$PasswordFile"
-        if ($LASTEXITCODE -ne 0) { throw 'INITDB_FAILED' }
-    } finally {
-        if (Test-Path -LiteralPath $PasswordFile) { Remove-Item -LiteralPath $PasswordFile -Force }
-    }
-    Write-Host 'DATABASE_INITIALIZED: PASS' -ForegroundColor Green
-}
-# pg_ctl status returns exit code 3 on a fresh unstarted cluster.
-# Avoid treating this expected condition as a PowerShell terminating error.
-$PreviousErrorPolicy = $ErrorActionPreference
-try {
-    $ErrorActionPreference = 'Continue'
-    & $Ctl -D $Data status 2>$null | Out-Null
-    $IsRunning = ($LASTEXITCODE -eq 0)
-} finally { $ErrorActionPreference = $PreviousErrorPolicy }
-if (-not $IsRunning) {
-    if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
-        throw 'PORT_55432_ALREADY_IN_USE'
-    }
-    & $Ctl -D $Data -l (Join-Path $Logs 'postgres.log') -o '-h 127.0.0.1 -p 55432' -w -t 60 start
-    if ($LASTEXITCODE -ne 0) { throw 'LOCAL_POSTGRES_START_FAILED: Check database\logs\postgres.log' }
-}
-Write-Host 'LOCAL_POSTGRES_RUNNING: 127.0.0.1:55432' -ForegroundColor Green
-
-$OldPassword = $env:PGPASSWORD
-$OldHost = $env:PGHOST
-$OldPort = $env:PGPORT
-try {
-    $env:PGPASSWORD = $Values['NIMIS_PG_ADMIN_PASSWORD']
-    $env:PGHOST = '127.0.0.1'
-    $env:PGPORT = '55432'
-    & $Psql -X -w -U postgres -d postgres -v ON_ERROR_STOP=1 -t -A -c "SELECT current_setting('port')"
-    if ($LASTEXITCODE -ne 0) { throw 'LOCAL_POSTGRES_AUTHENTICATION_FAILED' }
-    $Exists = (& $Psql -X -w -U postgres -d postgres -v ON_ERROR_STOP=1 -t -A -c "SELECT 1 FROM pg_database WHERE datname='nimis_collect_dev'" | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0) { throw 'DATABASE_LOOKUP_FAILED' }
-    if ($Exists -ne '1') {
-        & $Psql -X -w -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE nimis_collect_dev'
-        if ($LASTEXITCODE -ne 0) { throw 'DATABASE_CREATE_FAILED' }
-    }
-    & $Psql -X -w -U postgres -d nimis_collect_dev -v ON_ERROR_STOP=1 -f (Join-Path $Project 'server\postgres\001_dev_reference.sql')
-    if ($LASTEXITCODE -ne 0) { throw 'REFERENCE_MIGRATION_FAILED' }
-    & $Psql -X -w -U postgres -d nimis_collect_dev -v ON_ERROR_STOP=1 -v "app_password=$($Values['NIMIS_PG_PASSWORD'])" -f (Join-Path $Project 'server\postgres\002_local_readonly_role.sql')
-    if ($LASTEXITCODE -ne 0) { throw 'READ_ONLY_ROLE_FAILED' }
-} finally {
-    $env:PGPASSWORD = $OldPassword
-    $env:PGHOST = $OldHost
-    $env:PGPORT = $OldPort
-}
-Write-Host 'FICTIONAL_SCHEME_DATABASE: READY' -ForegroundColor Green
-Write-Host 'API_ACCOUNT: READ_ONLY' -ForegroundColor Green
-
-$Python = Join-Path $Project '.venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $Python)) {
-    & python -m venv '.venv'
-    if ($LASTEXITCODE -ne 0) { throw 'VENV_FAILED' }
-}
-& $Python -m pip install --index-url https://pypi.org/simple --timeout 90 --retries 6 --disable-pip-version-check -r 'server\requirements-postgres.txt'
-if ($LASTEXITCODE -ne 0) { throw 'POSTGRES_DRIVER_INSTALL_FAILED' }
-
-$env:NIMIS_COLLECT_DATABASE_URL = "postgresql://nimis_demo:$($Values['NIMIS_PG_PASSWORD'])@127.0.0.1:55432/nimis_collect_dev"
 $env:NIMIS_POSTGRES_DEMO_MODE = '1'
 $env:NIMIS_DEMO_MODE = '1'
 Write-Host 'POSTGRES_STORAGE: database\data' -ForegroundColor Green

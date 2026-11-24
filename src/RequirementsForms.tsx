@@ -2,9 +2,10 @@
  * Every form can be drafted offline; unapproved versions are NEVER uploaded.
  * Separate IDB prevents migration/mutation of existing baseline/photo storage.
  */
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {ClipboardList,MapPin,Camera,Save} from 'lucide-react';
 import catalogue from '../schemas/form-catalogue.v1.json';
+import manualSamples from '../schemas/fictional-manual-test-data.v1.json';
 import {loadAssignedCoreSchemes,type CoreAssignedScheme} from './core-stage-sync';
 import {savePhoto} from './storage';
 import {validateRequirementsDraft} from './requirements-validation';
@@ -149,6 +150,54 @@ export default function RequirementsForms(){
   const [notice,setNotice]=useState('Draft-only catalogue. Do not enter sensitive or official data into an unapproved development system.');
   const [busy,setBusy]=useState(false);
   const [sessionActive,setSessionActive]=useState(institutionalSessionIsActive());
+  const [bridgeState,setBridgeState]=useState<'checking'|'connected'|'offline'>('checking');
+  const [lastSeen,setLastSeen]=useState('');
+  const bridgeBusy=useRef(false);
+  async function refreshBridge(){
+    if(bridgeBusy.current)return;
+    bridgeBusy.current=true;
+    if(!import.meta.env.DEV)return;
+    try{
+      const result=await fetch('http://127.0.0.1:8775/api/v1/stage/health',{
+        cache:'no-store',signal:AbortSignal.timeout(4000),
+      });
+      const body=await result.json();
+      if(!result.ok||body.mode!=='isolated-development'||body.production_ready!==false)
+        throw new Error('Incorrect NIMIS Core environment');
+      setBridgeState('connected');setLastSeen(new Date().toLocaleTimeString());
+      try{
+        const assigned=await loadAssignedCoreSchemes();
+        setSchemes(assigned);
+        setSchemeId(old=>assigned.some(x=>x.scheme_id===old)?old:assigned[0]?.scheme_id??'');
+      }catch(error){
+        setNotice('Connected to Core, but assignment lookup needs attention: '+String(error));
+      }
+      if(navigator.onLine&&(import.meta.env.VITE_NIMIS_AUTH_MODE!=='oidc'||institutionalSessionIsActive())){
+        try{
+          const pending=(await listFormQueue()).some(item=>item.status==='pending');
+          if(pending)await syncQueuedForms();
+          await refreshFormReviewStatuses();
+        }catch(error){
+          if(!String(error).includes('already running'))
+            setNotice('Core connected; survey sync or receipt lookup needs attention: '+String(error));
+        }
+        setQueue(await listFormQueue());
+      }
+    }catch{
+      setBridgeState('offline');
+    }finally{
+      bridgeBusy.current=false;
+    }
+  }
+  useEffect(()=>{
+    if(!import.meta.env.DEV)return;
+    void refreshBridge();
+    // navigator.onLine can remain true while Core is offline. This bounded
+    // heartbeat finds the server once it starts and replays only queued events.
+    const handle=window.setInterval(()=>{if(document.visibilityState==='visible')void refreshBridge()},15000);
+    return()=>window.clearInterval(handle);
+  },[sessionActive]);
+
   const form=forms.find(x=>x.form_id===formId)!;
   const issues=validateRequirementsDraft(formId,answers,observed,source);
   useEffect(()=>{
@@ -216,8 +265,9 @@ export default function RequirementsForms(){
       await putRecord(item);
       setRecordId(id);setRevision(item.revision);
       setRecords(await listRecords());
-      setNotice('Offline draft saved with '+issues.length+' data-quality issue(s). NOT synchronized — Department-approved server validation is required.');
-    }catch(error){setNotice('Saving failed. Keep this screen open: '+String(error))}
+      setNotice('Survey saved on this device. Use Send to District to queue it, or keep editing offline.');
+      return item;
+    }catch(error){setNotice('Saving failed. Keep this screen open: '+String(error));return undefined;}
     finally{setBusy(false)}
   }
   async function enqueue(){
@@ -232,6 +282,36 @@ export default function RequirementsForms(){
       setNotice('Saved revision queued for ISOLATED fictional NIMIS Core. Event '+item.payload.event_id+' retained until acknowledged.');
     }catch(error){setNotice('Not queued: '+String(error))}
     finally{setBusy(false)}
+  }
+  /** Single-action presentation workflow. Offline means QUEUED, not sent. */
+  async function saveAndSubmit(){
+    if(issues.length){
+      setNotice('Correct '+issues.length+' data-quality issue(s) before submitting to District.');
+      return;
+    }
+    const saved=await save();
+    if(!saved)return;
+    setBusy(true);
+    try{
+      await queueSavedForm(saved,saved.base_scheme_revision);
+      if(bridgeState==='connected'&&navigator.onLine){
+        try{await syncQueuedForms()}catch{
+          // The exact event remains safely pending; never invent receipt.
+        }
+      }
+      const next=await listFormQueue();
+      setQueue(next);
+      const receipt=next.find(row=>row.id===saved.id+':'+saved.revision);
+      if(receipt?.status==='synced'){
+        setNotice('Survey received by NIMIS Core. District Officer can review it now. Receipt '+receipt.payload.event_id);
+      }else if(receipt?.status==='attention'){
+        setNotice('Survey saved, but Core requires attention: '+(receipt.reason||'review the fields'));
+      }else{
+        setNotice('Survey saved and queued safely on this device. Core is offline or busy; synchronization retries on reconnection. Do not clear browser storage.');
+      }
+    }catch(error){
+      setNotice('Survey saved offline. Could not queue/send: '+String(error)+'. Use Queue saved revision to retry.');
+    }finally{setBusy(false)}
   }
   async function upload(){
     setBusy(true);
@@ -256,8 +336,31 @@ export default function RequirementsForms(){
   if(!import.meta.env.DEV)return <p>Unapproved collection forms are disabled outside development.</p>;
   return <section className="panel" style={{padding:18}}>
     <div className="panel-title"><div><h2>Data collection — requirements forms</h2>
-      <p>All {forms.length} proposed operational datasets · Offline drafts only · Not published or synchronized</p></div></div>
+      <p>All {forms.length} proposed datasets · Offline saving · District-controlled synchronization and review</p></div></div>
+    <div role="status" className="form-validation" style={{marginBottom:12}}>
+      <strong>Connection to Main NIMIS: {bridgeState==='connected'?'Connected':bridgeState==='checking'?'Checking':'Offline / server unavailable'}</strong>
+      {' '}· Last checked successfully: {lastSeen||'not yet'} · {schemes.length} assigned schemes
+      <button className="secondary" type="button" disabled={busy}
+        style={{marginLeft:12}} onClick={()=>void refreshBridge()}>Reconnect and sync queued forms</button>
+      <p>Saved drafts remain local until queued. When the local Core reconnects, only previously queued forms are sent; District Officer must still verify them.</p>
+    </div>
     <p role="status" className="notice">{notice}</p>
+    <details className="panel" style={{padding:12,marginBottom:14}}>
+      <summary style={{cursor:'pointer',fontWeight:750}}>Fictional test values — manually enter, do not copy real records</summary>
+      <p>These examples belong only to the seeded local training scheme <strong>{manualSamples.scheme.scheme_name}</strong>, ID <code>{manualSamples.scheme.scheme_code}</code>. No answer will be filled in automatically.</p>
+      {manualSamples.forms.filter(sample=>sample.form_id===formId).map(sample=>
+        <div key={sample.form_id}>
+          <p><strong>Reporting month:</strong> {manualSamples.period_code} · <strong>Top-level observation:</strong> {manualSamples.observed_at} · <strong>Top-level source:</strong> {manualSamples.source}</p>
+          <table><thead><tr><th>Field</th><th>Manually type/select</th></tr></thead>
+          <tbody>{Object.entries(sample.answers).map(([field,value])=><tr key={field}>
+            <td>{field.replaceAll('_',' ')}</td>
+            <td><code style={{whiteSpace:'pre-wrap'}}>{Array.isArray(value)?value.join('; '):value}</code></td>
+          </tr>)}</tbody></table>
+          <p>For multiple-choice issues, enter one item per line. Save offline first, then queue. Manual test approval is a separate server process.</p>
+        </div>)}
+      {!manualSamples.forms.some(sample=>sample.form_id===formId)&&
+        <p>No prefilled example is defined for this provisional form; test with synthetic values only.</p>}
+    </details>
     {import.meta.env.VITE_NIMIS_AUTH_MODE==='oidc'&&<div className="form-validation">
       <strong>Institutional account: {sessionActive?'Signed in (session only)':'Not signed in'}</strong>
       <p>Uses an approved identity provider with PKCE. No shared officer account or stored access token.</p>
@@ -291,9 +394,11 @@ export default function RequirementsForms(){
         onChange={v=>setAnswers(old=>({...old,[field.field_id]:v}))}/>)}
     </div>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'16px 0'}}>
-      <button className="primary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={18}/> Save offline draft</button>
-      <button className="secondary" disabled={busy||issues.length>0||!recordId} onClick={()=>void enqueue()}>Queue saved revision (fictional test)</button>
-      <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Sync test queue to NIMIS Core</button>
+      <button className="primary" disabled={busy||issues.length>0||(!schemeId&&form.form_id!=='new_scheme_request')}
+        onClick={()=>void saveAndSubmit()}><Save size={18}/> Save and send to District</button>
+      <button className="secondary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={17}/> Save offline only</button>
+      <button className="secondary" disabled={busy||issues.length>0||!recordId} onClick={()=>void enqueue()}>Queue saved revision</button>
+      <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Retry queued uploads</button>
       <button className="secondary" disabled={busy||!queue.some(x=>x.status==='synced'||Boolean(x.server_status))}
         onClick={()=>void refreshReviews()}>Refresh officer decisions</button>
       <span>Revision {revision} · Offline save first; sync and approval are separate actions</span>
