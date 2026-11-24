@@ -33,7 +33,7 @@ def _authorize(actor: Actor, stage: str):
 
 
 def _inbox(stage: str):
-    statuses = ("VERIFIED", "REVIEWED", "PUBLISHED") if stage == "province" else ("REVIEWED", "PUBLISHED")
+    statuses = ("VERIFIED", "REVIEWED", "PUBLISHED") if stage == "province" else ("REVIEWED", "TECH_APPROVED", "PUBLISHED")
     with connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -83,9 +83,12 @@ def _decision(event_id: UUID, body: ReviewAction, actor: Actor, stage: str):
         old_status = "VERIFIED"
         new_status = "REVIEWED" if action == "REVIEW" else "RETURNED"
     else:
-        if action != "PUBLISH":
-            raise HTTPException(422, detail="Admin can only PUBLISH a reviewed fictional record")
-        old_status, new_status = "REVIEWED", "PUBLISHED"
+        if action == "TECH_APPROVE":
+            old_status, new_status = "REVIEWED", "TECH_APPROVED"
+        elif action == "PUBLISH":
+            old_status, new_status = "TECH_APPROVED", "PUBLISHED"
+        else:
+            raise HTTPException(422, detail="Admin must TECH_APPROVE before PUBLISH")
 
     with connection() as conn:
         with conn.cursor() as cur:
