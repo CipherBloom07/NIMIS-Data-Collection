@@ -5,6 +5,7 @@
 import {useEffect,useState} from 'react';
 import {ClipboardList,MapPin,Camera,Save} from 'lucide-react';
 import catalogue from '../schemas/form-catalogue.v1.json';
+import manualSamples from '../schemas/fictional-manual-test-data.v1.json';
 import {loadAssignedCoreSchemes,type CoreAssignedScheme} from './core-stage-sync';
 import {savePhoto} from './storage';
 import {validateRequirementsDraft} from './requirements-validation';
@@ -258,6 +259,22 @@ export default function RequirementsForms(){
     <div className="panel-title"><div><h2>Data collection — requirements forms</h2>
       <p>All {forms.length} proposed operational datasets · Offline drafts only · Not published or synchronized</p></div></div>
     <p role="status" className="notice">{notice}</p>
+    <details className="panel" style={{padding:12,marginBottom:14}}>
+      <summary style={{cursor:'pointer',fontWeight:750}}>Fictional test values — manually enter, do not copy real records</summary>
+      <p>These examples belong only to the seeded local training scheme <strong>{manualSamples.scheme.scheme_name}</strong>, ID <code>{manualSamples.scheme.scheme_code}</code>. No answer will be filled in automatically.</p>
+      {manualSamples.forms.filter(sample=>sample.form_id===formId).map(sample=>
+        <div key={sample.form_id}>
+          <p><strong>Reporting month:</strong> {manualSamples.period_code} · <strong>Top-level observation:</strong> {manualSamples.observed_at} · <strong>Top-level source:</strong> {manualSamples.source}</p>
+          <table><thead><tr><th>Field</th><th>Manually type/select</th></tr></thead>
+          <tbody>{Object.entries(sample.answers).map(([field,value])=><tr key={field}>
+            <td>{field.replaceAll('_',' ')}</td>
+            <td><code style={{whiteSpace:'pre-wrap'}}>{Array.isArray(value)?value.join('; '):value}</code></td>
+          </tr>)}</tbody></table>
+          <p>For multiple-choice issues, enter one item per line. Save offline first, then queue. Manual test approval is a separate server process.</p>
+        </div>)}
+      {!manualSamples.forms.some(sample=>sample.form_id===formId)&&
+        <p>No prefilled example is defined for this provisional form; test with synthetic values only.</p>}
+    </details>
     {import.meta.env.VITE_NIMIS_AUTH_MODE==='oidc'&&<div className="form-validation">
       <strong>Institutional account: {sessionActive?'Signed in (session only)':'Not signed in'}</strong>
       <p>Uses an approved identity provider with PKCE. No shared officer account or stored access token.</p>
