@@ -11,6 +11,7 @@ import DataTestPanel from './DataTestPanel';
 import WorkflowHome from './WorkflowHome';
 import HelpPanel from './HelpPanel';
 import StoragePanel from './StoragePanel';
+import DemoIntegrationPanel from './DemoIntegrationPanel';
 import BrandLogo from './BrandLogo';
 import { quickStorageRisk, type StorageRisk } from './storage-health';
 import './storage-panel.css';
@@ -36,6 +37,7 @@ export default function App() {
   const [dataTestView, setDataTestView] = useState(false);
   const [helpView, setHelpView] = useState(false);
   const [storageView, setStorageView] = useState(false);
+  const [integrationView, setIntegrationView] = useState(false);
   const [storageRisk, setStorageRisk] = useState<StorageRisk>('unknown');
   const [photoPreviews, setPhotoPreviews] = useState<Record<string,string>>({});
   const draftIdRef = useRef<string | null>(null);
@@ -64,6 +66,7 @@ export default function App() {
     setDataTestView(false);
     setHelpView(false);
     setStorageView(false);
+    setIntegrationView(false);
     setReferenceView(false);
     sessionRef.current += 1;
     draftIdRef.current = draft?.id ?? null;
@@ -105,7 +108,7 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [answers, activeId]);
 
-  async function leaveForm(destination: 'dashboard' | 'schemes' | 'test' | 'help' | 'storage') {
+  async function leaveForm(destination: 'dashboard' | 'schemes' | 'test' | 'help' | 'storage' | 'integration') {
     if (busy) return;
     setBusy(true);
     try {
@@ -121,6 +124,7 @@ export default function App() {
       setDataTestView(destination === 'test');
       setHelpView(destination === 'help');
       setStorageView(destination === 'storage');
+      setIntegrationView(destination === 'integration');
       setMenuOpen(false);
       await refresh();
       if (activeId !== undefined && Object.keys(answers).length > 0) {
@@ -280,7 +284,7 @@ export default function App() {
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
       <div className="logo-row"><BrandLogo/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
-      <button className={'nav-button ' + (!editing && !referenceView && !dataTestView && !helpView && !storageView ? 'selected' : '')} onClick={() => void leaveForm('dashboard')}>
+      <button className={'nav-button ' + (!editing && !referenceView && !dataTestView && !helpView && !storageView && !integrationView ? 'selected' : '')} onClick={() => void leaveForm('dashboard')}>
         <ClipboardList size={19}/> Survey dashboard
       </button>
       <button className="nav-button" onClick={() => void startNewSurvey()}><FilePlus2 size={19}/> New survey</button>
@@ -288,6 +292,7 @@ export default function App() {
       {import.meta.env.DEV && <button className={'nav-button ' + (dataTestView ? 'selected' : '')} onClick={() => void leaveForm('test')}><ClipboardList size={19}/> Test fictional data</button>}
       <button className={'nav-button ' + (helpView ? 'selected' : '')} onClick={() => void leaveForm('help')}><ClipboardList size={19}/> How to use this app</button>
       <button className={'nav-button ' + (storageView ? 'selected' : '')} onClick={() => void leaveForm('storage')}><Download size={19}/> Storage Management</button>
+      {import.meta.env.DEV && <button className={'nav-button ' + (integrationView ? 'selected' : '')} onClick={() => void leaveForm('integration')}><ClipboardList size={19}/> Collector–District test</button>}
       <div className="aside-spacer"/>
       <div className="side-status"><CloudOff size={18}/><span>Local-only development build<br/><small>Server sync not connected</small></span></div>
     </aside>
@@ -301,7 +306,7 @@ export default function App() {
       <div className="content">
         {notice && <div role="status" className="notice"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice('')}><X size={16}/></button></div>}
         {(storageRisk === 'warning' || storageRisk === 'critical') && <div className={'storage-risk storage-risk-' + storageRisk} role="alert"><AlertTriangle size={22}/><div><strong>{storageRisk === 'critical' ? 'Storage critically low' : 'Storage getting low'}</strong><p>New photos or surveys might fail to save. Preserve local records and check available space.</p></div><button type="button" className="secondary" onClick={() => void leaveForm('storage')}>Check storage</button></div>}
-        {!editing ? (storageView ? <StoragePanel/> : helpView ? <HelpPanel/> : dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel onStartSurvey={() => void startNewSurvey()}/> : <>
+        {!editing ? (integrationView ? <DemoIntegrationPanel/> : storageView ? <StoragePanel/> : helpView ? <HelpPanel/> : dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel onStartSurvey={() => void startNewSurvey()}/> : <>
           <div className="heading-row"><div><div className="overline">NIMIS / FIELD OPERATIONS</div><h1>Survey dashboard</h1><p>Capture reliable irrigation scheme information across Zimbabwe.</p></div>
           <button className="primary" onClick={() => begin()}><FilePlus2 size={18}/> New survey</button></div>
           <WorkflowHome drafts={drafts} onStart={() => void startNewSurvey()} onSchemes={() => void leaveForm('schemes')} onResume={begin}/>

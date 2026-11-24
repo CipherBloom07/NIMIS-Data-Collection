@@ -15,6 +15,7 @@ from typing import Annotated
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from server import postgres_reference
 
@@ -24,11 +25,24 @@ ISSUER = "nimis-collect-reference"
 AUDIENCE = "nimis-collect-reference-client"
 DEMO_USER_ID = "10000000-0000-4000-8000-000000000001"
 DEMO_SCHEME_ID = "DEMO-SCHEME-001"
+DEMO_DISTRICT_USER_ID = "10000000-0000-4000-8000-000000000002"
+DEMO_PROVINCIAL_USER_ID = "10000000-0000-4000-8000-000000000003"
+DEMO_ADMIN_USER_ID = "10000000-0000-4000-8000-000000000004"
 
 app = FastAPI(
     title="NIMIS Collect — Reference Access/Reference API",
     version="0.2.0",
     description="Development reference only, never an authorized Ministry production endpoint.",
+)
+
+# Allow only local main NIMIS development UI to access the fictional API.
+# No production deployment or arbitrary remote origins are supported.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:8081", "http://localhost:8081"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 class Actor(BaseModel):
@@ -63,6 +77,20 @@ def _actors() -> dict[str, Actor]:
         province_ids=["DEMO-PROVINCE"],
         district_ids=["DEMO-DISTRICT"],
         scheme_ids=[DEMO_SCHEME_ID],
+    ), DEMO_DISTRICT_USER_ID: Actor(
+        user_id=DEMO_DISTRICT_USER_ID,
+        role="district_officer",
+        province_ids=["DEMO-PROVINCE"],
+        district_ids=["DEMO-DISTRICT"],
+        scheme_ids=[DEMO_SCHEME_ID],
+    ), DEMO_PROVINCIAL_USER_ID: Actor(
+        user_id=DEMO_PROVINCIAL_USER_ID,
+        role="provincial_officer", province_ids=["DEMO-PROVINCE"],
+        district_ids=["DEMO-DISTRICT"], scheme_ids=[DEMO_SCHEME_ID],
+    ), DEMO_ADMIN_USER_ID: Actor(
+        user_id=DEMO_ADMIN_USER_ID,
+        role="admin", province_ids=["DEMO-PROVINCE"],
+        district_ids=["DEMO-DISTRICT"], scheme_ids=[DEMO_SCHEME_ID],
     )}
 
 def current_actor(authorization: Annotated[str | None, Header()] = None) -> Actor:
@@ -106,11 +134,18 @@ def health():
 def development_token(credentials: DemoTokenRequest, request: Request):
     if not _demo_enabled() or not _loopback(request):
         raise HTTPException(status_code=404, detail="Unavailable")
-    if credentials.username != "officer.demo":
+    subjects = {
+        "officer.demo": DEMO_USER_ID,
+        "district.demo": DEMO_DISTRICT_USER_ID,
+        "provincial.demo": DEMO_PROVINCIAL_USER_ID,
+        "admin.demo": DEMO_ADMIN_USER_ID,
+    }
+    subject = subjects.get(credentials.username)
+    if subject is None:
         raise HTTPException(status_code=401, detail="Unknown demo account")
     now = datetime.now(timezone.utc)
     access_token = jwt.encode(
-        {"sub": DEMO_USER_ID, "iss": ISSUER, "aud": AUDIENCE,
+        {"sub": subject, "iss": ISSUER, "aud": AUDIENCE,
          "iat": now, "exp": now + timedelta(minutes=30)},
         _secret(),
         algorithm="HS256",
@@ -188,3 +223,19 @@ def schemes(
 @app.post("/api/v1/submissions/{submission_id}/decisions")
 def unavailable_writes(submission_id: str | None = None):
     raise HTTPException(status_code=501, detail="Not implemented: security review and production identity required")
+
+# Experimental local-only Collector -> District demonstration. Never enable on production.
+from server.demo_integration import router as demo_integration_router
+app.include_router(demo_integration_router)
+
+from server.demo_review_stages import router as demo_review_router
+app.include_router(demo_review_router)
+
+# Optional staging adapter: disabled unless approved OIDC and registry settings exist.
+# Intentionally separate from /api/v1/dev/integration and its fictional accounts.
+from server.secure_sync import router as secure_sync_router
+app.include_router(secure_sync_router)
+
+# Separate staged, OIDC-scoped district verification API. Never uses demo tokens.
+from server.secure_review import router as secure_review_router
+app.include_router(secure_review_router)
