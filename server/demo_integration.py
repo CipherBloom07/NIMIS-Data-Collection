@@ -6,7 +6,7 @@ remote connections or anonymous writes. Production sync remains disabled.
 from __future__ import annotations
 
 import os
-from uuid import UUID
+from uuid import UUID, uuid4
 from urllib.parse import urlparse
 from typing import Any
 
@@ -141,5 +141,12 @@ def decide(event_id: UUID, body: DemoDecision, request: Request, actor: Actor = 
             )
             if cur.fetchone() is None:
                 raise HTTPException(409, detail="Submission missing or already reviewed")
+            cur.execute(
+                """INSERT INTO nimis_collect_demo.demo_decision
+                   (decision_id,event_id,actor_user_id,actor_role,action,reason)
+                   VALUES (%s,%s,%s,%s,%s,%s)""",
+                (uuid4(), event_id, actor.user_id, actor.role, body.action,
+                 body.reason.strip() or None),
+            )
     return {"event_id": str(event_id), "status": "VERIFIED" if body.action == "VERIFY" else "RETURNED",
             "source": "FICTIONAL_LOCAL_DEMO"}
