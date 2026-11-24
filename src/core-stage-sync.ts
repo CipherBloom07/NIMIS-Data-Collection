@@ -1,3 +1,4 @@
+import {collectorAuthorizationHeaders} from './institutional-auth';
 /** ISOLATED FICTIONAL OPERATIONS ONLY.
  * Separate from real baseline survey drafts/photos/outbox. No data leaves device
  * except user-created fictional Stage 1 operational status measurements.
@@ -20,7 +21,6 @@ export type StageOperation = {
 };
 const STORE='nimis_core_stage_demo_operations_v1';
 const DATABASE='nimis_core_stage_demo_v1';
-const STAGE_ACTOR='00000000-0000-4000-8000-000000000004';
 const BASE='http://127.0.0.1:8775/api/v1/stage';
 export const DEMO_SCHEME='00000000-0000-4000-8000-000000001000';
 
@@ -32,9 +32,9 @@ export type CoreAssignedScheme = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function loadAssignedCoreSchemes():Promise<CoreAssignedScheme[]> {
   // Never permit synthetic development actor authentication in a production build.
-  if (!import.meta.env.DEV) throw new Error('Fictional scheme lookup is disabled in production.');
+  if (!import.meta.env.DEV) throw new Error('Isolated stage scheme lookup is disabled in production.');
   const result=await fetch(BASE+'/schemes',{
-    cache:'no-store',headers:{'X-Nimis-Dev-Actor':STAGE_ACTOR},
+    cache:'no-store',headers:collectorAuthorizationHeaders(),
   });
   if(!result.ok)throw new Error('Main NIMIS Core assigned schemes unavailable (HTTP '+result.status+').');
   const data:unknown=await result.json();
@@ -134,7 +134,7 @@ export async function syncStageOperations():Promise<{accepted:number;pending:num
     if(rows.length===0)return {accepted:0,pending:0,errors:0};
     const response=await fetch(BASE+'/sync/push',{
       method:'POST',cache:'no-store',
-      headers:{'Content-Type':'application/json','X-Nimis-Dev-Actor':STAGE_ACTOR},
+      headers:{'Content-Type':'application/json',...collectorAuthorizationHeaders()},
       body:JSON.stringify({operations:rows.map(row=>row.payload)}),
     });
     if(!response.ok)throw new Error('Development server returned HTTP '+response.status+'. Keep operations queued.');
@@ -167,7 +167,7 @@ export async function pullStageStatuses():Promise<{updated:number;errors:number}
   for(const row of rows){
     try{
       const response=await fetch(BASE+'/sync/status/'+encodeURIComponent(row.payload.submission_id),{
-        cache:'no-store',headers:{'X-Nimis-Dev-Actor':STAGE_ACTOR},
+        cache:'no-store',headers:collectorAuthorizationHeaders(),
       });
       if(!response.ok){errors++;continue;}
       const payload:unknown=await response.json();
