@@ -24,6 +24,7 @@ ISSUER = "nimis-collect-reference"
 AUDIENCE = "nimis-collect-reference-client"
 DEMO_USER_ID = "10000000-0000-4000-8000-000000000001"
 DEMO_SCHEME_ID = "DEMO-SCHEME-001"
+DEMO_DISTRICT_USER_ID = "10000000-0000-4000-8000-000000000002"
 
 app = FastAPI(
     title="NIMIS Collect — Reference Access/Reference API",
@@ -60,6 +61,12 @@ def _actors() -> dict[str, Actor]:
     return {DEMO_USER_ID: Actor(
         user_id=DEMO_USER_ID,
         role="field_officer",
+        province_ids=["DEMO-PROVINCE"],
+        district_ids=["DEMO-DISTRICT"],
+        scheme_ids=[DEMO_SCHEME_ID],
+    ), DEMO_DISTRICT_USER_ID: Actor(
+        user_id=DEMO_DISTRICT_USER_ID,
+        role="district_officer",
         province_ids=["DEMO-PROVINCE"],
         district_ids=["DEMO-DISTRICT"],
         scheme_ids=[DEMO_SCHEME_ID],
@@ -106,11 +113,12 @@ def health():
 def development_token(credentials: DemoTokenRequest, request: Request):
     if not _demo_enabled() or not _loopback(request):
         raise HTTPException(status_code=404, detail="Unavailable")
-    if credentials.username != "officer.demo":
+    if credentials.username not in ("officer.demo", "district.demo"):
         raise HTTPException(status_code=401, detail="Unknown demo account")
+    subject = DEMO_USER_ID if credentials.username == "officer.demo" else DEMO_DISTRICT_USER_ID
     now = datetime.now(timezone.utc)
     access_token = jwt.encode(
-        {"sub": DEMO_USER_ID, "iss": ISSUER, "aud": AUDIENCE,
+        {"sub": subject, "iss": ISSUER, "aud": AUDIENCE,
          "iat": now, "exp": now + timedelta(minutes=30)},
         _secret(),
         algorithm="HS256",
@@ -188,3 +196,7 @@ def schemes(
 @app.post("/api/v1/submissions/{submission_id}/decisions")
 def unavailable_writes(submission_id: str | None = None):
     raise HTTPException(status_code=501, detail="Not implemented: security review and production identity required")
+
+# Experimental local-only Collector -> District demonstration. Never enable on production.
+from server.demo_integration import router as demo_integration_router
+app.include_router(demo_integration_router)
