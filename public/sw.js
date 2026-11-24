@@ -1,11 +1,10 @@
-const CACHE = 'nimis-field-shell-v4';
+const CACHE = 'nimis-field-shell-v5';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll([
     '/',
     '/manifest.webmanifest',
     '/nimis-logo.png',
     '/nimis-icon.svg',
-    '/zimbabwe-coat-of-arms.jpg',
     '/zimbabwe-coat-of-arms.svg'
   ])));
   self.skipWaiting();

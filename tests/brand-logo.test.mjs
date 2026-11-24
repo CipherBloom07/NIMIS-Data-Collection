@@ -16,14 +16,14 @@ test('desktop and mobile headers use a resilient shared logo', () => {
   assert.match(app, /<BrandLogo\/>/);
   assert.match(app, /<BrandLogo compact\/>/);
   assert.match(logo, /onError=/);
-  assert.match(logo, /zimbabwe-coat-of-arms\.jpg/);
+  assert.match(logo, /nimis-logo\.png/);
   assert.match(logo, /zimbabwe-coat-of-arms\.svg/);
   assert.match(logo, /import\.meta\.env\.BASE_URL/);
 });
 
-test('service worker upgrades old branding cache and keeps both emblems offline', () => {
+test('service worker upgrades the branding cache and keeps the logo fallback offline', () => {
   const sw = readFileSync('public/sw.js', 'utf8');
-  assert.match(sw, /nimis-field-shell-v4/);
-  assert.match(sw, /'\/zimbabwe-coat-of-arms\.jpg'/);
+  assert.match(sw, /nimis-field-shell-v5/);
+  assert.match(sw, /'\/nimis-logo\.png'/);
   assert.match(sw, /'\/zimbabwe-coat-of-arms\.svg'/);
 });
