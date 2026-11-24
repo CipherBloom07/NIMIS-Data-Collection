@@ -9,6 +9,7 @@ import {loadAssignedCoreSchemes,type CoreAssignedScheme} from './core-stage-sync
 import {savePhoto} from './storage';
 import {validateRequirementsDraft} from './requirements-validation';
 import {queueSavedForm,listFormQueue,syncQueuedForms,type StageQueueItem} from './form-stage-sync';
+import {institutionalSessionIsActive,startInstitutionalSignIn,signOutInstitutionalSession} from './oidc-session';
 
 type FormField={field_id:string;type:string;units:string|null;metadata:string[]};
 type FormDefinition={form_id:string;form_version:number;name:string;frequency:string;fields:FormField[]};
@@ -108,6 +109,7 @@ export default function RequirementsForms(){
   const [revision,setRevision]=useState(0);
   const [notice,setNotice]=useState('Draft-only catalogue. Do not enter sensitive or official data into an unapproved development system.');
   const [busy,setBusy]=useState(false);
+  const [sessionActive,setSessionActive]=useState(institutionalSessionIsActive());
   const form=forms.find(x=>x.form_id===formId)!;
   const issues=validateRequirementsDraft(formId,answers,observed,source);
   useEffect(()=>{
@@ -123,7 +125,7 @@ export default function RequirementsForms(){
   },[]);
   useEffect(()=>{void loadAssignedCoreSchemes().then(list=>{
     setSchemes(list);setSchemeId(list[0]?.scheme_id??'');
-  }).catch(error=>setNotice('Main NIMIS Core scheme assignments unavailable: '+String(error)))},[]);
+  }).catch(error=>setNotice('Main NIMIS Core scheme assignments unavailable: '+String(error)))},[sessionActive]);
   function fresh(next:string){setFormId(next);setAnswers({});setRecordId(null);setRevision(0)}
   function edit(record:LocalRecord){
     setFormId(record.form_id);setSchemeId(record.scheme_id);setPeriod(record.period_code);
@@ -179,6 +181,16 @@ export default function RequirementsForms(){
     <div className="panel-title"><div><h2>Data collection — requirements forms</h2>
       <p>All {forms.length} proposed operational datasets · Offline drafts only · Not published or synchronized</p></div></div>
     <p role="status" className="notice">{notice}</p>
+    {import.meta.env.VITE_NIMIS_AUTH_MODE==='oidc'&&<div className="form-validation">
+      <strong>Institutional account: {sessionActive?'Signed in (session only)':'Not signed in'}</strong>
+      <p>Uses an approved identity provider with PKCE. No shared officer account or stored access token.</p>
+      {!sessionActive?<button className="secondary" type="button" onClick={()=>{
+        void startInstitutionalSignIn().catch(error=>setNotice('Sign-in unavailable: '+String(error)));
+      }}>Sign in with institutional account</button>:
+        <button type="button" className="secondary" onClick={()=>{
+          signOutInstitutionalSession();setSessionActive(false);setSchemes([]);setSchemeId('');
+        }}>Sign out of this device</button>}
+    </div>}
     <div className="form-grid">
       <label className="field"><span>Required dataset</span><select value={formId} onChange={e=>fresh(e.target.value)}>
         {forms.map(f=><option key={f.form_id} value={f.form_id}>{f.name}</option>)}</select></label>
