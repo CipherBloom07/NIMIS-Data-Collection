@@ -62,6 +62,8 @@ def submit(body: DemoSubmission, request: Request, actor: Actor = Depends(curren
         raise HTTPException(403, detail="Collector role required")
     if body.scheme_id != DEMO_SCHEME or body.form_id != "scheme_baseline":
         raise HTTPException(422, detail="Only the fictional assigned scheme is supported")
+    if DEMO_SCHEME not in actor.scheme_ids or DEMO_DISTRICT not in actor.district_ids:
+        raise HTTPException(403, detail="Collector assignment is not active")
     # Never allow a generic survey payload or personally identifying fields.
     payload: dict[str, Any] = {"scheme_name": "Example Scheme (fictional)", "note": body.note}
     with connection() as conn:
