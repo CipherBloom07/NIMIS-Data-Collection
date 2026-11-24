@@ -8,7 +8,7 @@ import catalogue from '../schemas/form-catalogue.v1.json';
 import {loadAssignedCoreSchemes,type CoreAssignedScheme} from './core-stage-sync';
 import {savePhoto} from './storage';
 import {validateRequirementsDraft} from './requirements-validation';
-import {queueSavedForm,listFormQueue,syncQueuedForms,type StageQueueItem} from './form-stage-sync';
+import {queueSavedForm,listFormQueue,syncQueuedForms,refreshFormReviewStatuses,type StageQueueItem} from './form-stage-sync';
 import {institutionalSessionIsActive,startInstitutionalSignIn,signOutInstitutionalSession} from './oidc-session';
 
 type FormField={field_id:string;type:string;units:string|null;metadata:string[]};
@@ -172,8 +172,18 @@ export default function RequirementsForms(){
       const result=await syncQueuedForms();
       setQueue(await listFormQueue());
       setNotice('Development sync: '+result.synced+' acknowledged, '+result.remaining+
-        ' pending, '+result.attention+' require review. Photo files are NOT transferred.');
+        ' pending, '+result.attention+' require review. Referenced photos are uploaded and checksum-verified before form receipt for assigned schemes.');
     }catch(error){setNotice('Sync unavailable; operations preserved: '+String(error))}
+    finally{setBusy(false)}
+  }
+  async function refreshReviews(){
+    setBusy(true);
+    try{
+      const result=await refreshFormReviewStatuses();
+      setQueue(await listFormQueue());
+      setNotice('Officer review: '+result.checked+' receipts checked, '+result.updated+
+        ' status changes, '+result.attention+' returned or conflicted. Returned submissions need a corrected new draft revision.');
+    }catch(error){setNotice('Review lookup unavailable; saved receipts remain untouched: '+String(error))}
     finally{setBusy(false)}
   }
   if(!import.meta.env.DEV)return <p>Unapproved collection forms are disabled outside development.</p>;
@@ -217,11 +227,25 @@ export default function RequirementsForms(){
       <button className="primary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={18}/> Save offline draft</button>
       <button className="secondary" disabled={busy||issues.length>0||!recordId} onClick={()=>void enqueue()}>Queue saved revision (fictional test)</button>
       <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Sync test queue to NIMIS Core</button>
+      <button className="secondary" disabled={busy||!queue.some(x=>x.status==='synced'||Boolean(x.server_status))}
+        onClick={()=>void refreshReviews()}>Refresh officer decisions</button>
       <span>Revision {revision} · No automatic upload or approval</span>
     </div>
     <p role="status"><strong>Development queue:</strong> {queue.filter(x=>x.status==='pending').length} pending,
       {' '}{queue.filter(x=>x.status==='synced').length} acknowledged,
-      {' '}{queue.filter(x=>x.status==='attention').length} need attention. Only metadata and form answers are staged; photographs stay on this device.</p>
+      {' '}{queue.filter(x=>x.status==='attention').length} need attention.
+      Photos for assigned schemes are uploaded to the isolated local Core before form receipt; originals remain on the device.</p>
+    {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING').length>0&&
+     <div role="status" className="form-validation"><strong>Collector follow-up required</strong>
+      {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING')
+        .map(row=><p key={row.id}>{row.payload.form_id} · {row.payload.period_code} · {row.server_status??row.status}
+          {row.reason?': '+row.reason:''}</p>)}
+     </div>}
+    {queue.some(x=>Boolean(x.server_status))&&
+     <div><h3>Officer review status</h3>
+      {queue.filter(x=>Boolean(x.server_status)).slice(-10).map(row=>
+       <p key={row.id}><strong>{row.payload.form_id}</strong> · {row.payload.period_code} · {row.server_status}
+       </p>)}</div>}
     <h3><ClipboardList size={18}/> Saved local forms</h3>
     {records.length===0?<p>No drafts in the proposed form catalogue.</p>:
       <div className="record-list">{records.slice().reverse().map(row=><button key={row.id} className="record"
