@@ -115,7 +115,7 @@ export default function RequirementsForms(){
   }
   async function save(){
     if(busy)return;
-    if(!schemes.some(x=>x.scheme_id===schemeId)){setNotice('Select a scheme assigned by Main NIMIS Core.');return;}
+    if(form.form_id!=='new_scheme_request' && !schemes.some(x=>x.scheme_id===schemeId)){setNotice('Select a scheme assigned by Main NIMIS Core.');return;}
     if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)){setNotice('Use a valid YYYY-MM reporting period.');return;}
     setBusy(true);
     try{
@@ -139,7 +139,7 @@ export default function RequirementsForms(){
     <div className="form-grid">
       <label className="field"><span>Required dataset</span><select value={formId} onChange={e=>fresh(e.target.value)}>
         {forms.map(f=><option key={f.form_id} value={f.form_id}>{f.name}</option>)}</select></label>
-      <label className="field"><span>Assigned scheme (Main NIMIS Core)</span>
+      <label className="field"><span>{form.form_id==='new_scheme_request'?'Existing scheme (optional — new scheme request only)':'Assigned scheme (Main NIMIS Core)'}</span>
         <select value={schemeId} onChange={e=>setSchemeId(e.target.value)}>
           {!schemes.length&&<option value="">No approved scheme assignments loaded</option>}
           {schemes.map(s=><option key={s.scheme_id} value={s.scheme_id}>{s.scheme_name} — {s.scheme_code}</option>)}
@@ -154,7 +154,7 @@ export default function RequirementsForms(){
         onChange={v=>setAnswers(old=>({...old,[field.field_id]:v}))}/>)}
     </div>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'16px 0'}}>
-      <button className="primary" disabled={busy||!schemeId} onClick={()=>void save()}><Save size={18}/> Save offline draft</button>
+      <button className="primary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={18}/> Save offline draft</button>
       <span>Revision {revision} · No automatic upload or approval</span>
     </div>
     <h3><ClipboardList size={18}/> Saved local forms</h3>
