@@ -1,3 +1,4 @@
+import {collectorAuthorizationHeaders} from './institutional-auth';
 /** Isolated LOCAL/FICTIONAL bridge for the main NIMIS Core stage form intake.
  * Only an explicit saved draft can be queued. No legacy baseline operations,
  * photos, or real user identities are read or transmitted.
@@ -20,23 +21,6 @@ export type StageQueueItem = {
 };
 const DB='nimis_requirements_drafts_v1',QUEUE='queue',VERSION=2;
 const BASE='http://127.0.0.1:8775/api/v1/stage/forms';
-const ACTOR='00000000-0000-4000-8000-000000000004';
-/** In-memory ONLY. Connected by an approved OIDC sign-in adapter. */
-let institutionalAccessToken:string|null=null;
-export function setInstitutionalSyncToken(token:string|null){
-  if(token!==null && (!token.trim()||token.length>12000||token.split('.').length!==3)){
-    throw new Error('Signed institutional access token required');
-  }
-  institutionalAccessToken=token;
-}
-function stageAuthHeaders():Record<string,string>{
-  if(import.meta.env.VITE_NIMIS_AUTH_MODE==='oidc'){
-    if(!institutionalAccessToken)throw new Error('Institutional collector sign-in required');
-    return {'Authorization':'Bearer '+institutionalAccessToken};
-  }
-  if(!import.meta.env.DEV)throw new Error('Synthetic test identity disabled');
-  return {'X-Nimis-Dev-Actor':ACTOR};
-}
 const DEVICE_KEY='nimis_draft_pilot_device_v1';
 function assertDev(){if(!import.meta.env.DEV)throw new Error('Development-only sync route is disabled');}
 function openDb():Promise<IDBDatabase>{
@@ -145,7 +129,7 @@ export async function syncQueuedForms():Promise<{synced:number;remaining:number;
       try{
         response=await fetch(BASE+'/sync/push',{
           method:'POST',cache:'no-store',
-          headers:{...stageAuthHeaders(),'Content-Type':'application/json'},
+          headers:{...collectorAuthorizationHeaders(),'Content-Type':'application/json'},
           body:JSON.stringify({operations:[row.payload]}),
         });
       }catch{
