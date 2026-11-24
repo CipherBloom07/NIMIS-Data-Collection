@@ -25,9 +25,9 @@ body { background: var(--zw-cream); }
   align-items: center;
 }
 .logo-row img {
-  width: 76px;
-  height: 76px;
-  flex: 0 0 76px;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
   object-fit: contain;
   background: #fff;
   border: 1px solid #e2dfd2;
@@ -94,7 +94,7 @@ h1, h2, h3 { color: var(--zw-blue-dark); }
 .network:not(.connected) { color: #7d402c; background: #fff1e9; }
 .notice { background: #f0f8ed; border-color: #bed9c5; color: var(--zw-green-dark); }
 .footer { color: var(--zw-muted); }
-@media(max-width:800px) {
+@media(max-width:900px) {
   .logo-row img { width: 56px; height: 56px; flex-basis: 56px; }
 }
 

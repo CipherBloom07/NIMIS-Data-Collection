@@ -12,7 +12,7 @@ test('official coat of arms PNG is a real PNG, not a malformed JPEG', () => {
 
 test('responsive rules include small screens, tablet, desktop and accessible controls', () => {
   const css = readFileSync('src/responsive.css', 'utf8');
-  for (const marker of ['max-width: 360px', 'max-width: 530px', 'max-width: 800px',
+  for (const marker of ['max-width: 360px', 'max-width: 530px', 'max-width: 900px',
     'max-width: 1150px', 'min-width: 1600px', 'min-height: 44px',
     'prefers-reduced-motion', '.mobile-scrim']) {
     assert.ok(css.includes(marker), 'Missing responsive rule: ' + marker);

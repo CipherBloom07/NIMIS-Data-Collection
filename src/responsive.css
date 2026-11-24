@@ -26,7 +26,7 @@ button { max-width: 100%; }
   .content { padding-left: clamp(42px, 5vw, 96px); padding-right: clamp(42px, 5vw, 96px); }
   .survey-layout { grid-template-columns: 285px minmax(0, 1fr); }
 }
-@media (min-width: 801px) and (max-width: 1150px) {
+@media (min-width: 901px) and (max-width: 1150px) {
   .sidebar { width: 218px; }
   .main { margin-left: 218px; width: calc(100% - 218px); }
   .topbar { padding-inline: 20px; }
@@ -35,7 +35,7 @@ button { max-width: 100%; }
   .form-grid { grid-template-columns: 1fr; }
   .check-group, .attachment { grid-column: span 1; }
 }
-@media (max-width: 800px) {
+@media (max-width: 900px) {
   .sidebar { width: min(300px, 86vw); overscroll-behavior: contain; overflow-y: auto; }
   .sidebar-open { z-index: 60; }
   .mobile-scrim {
@@ -51,7 +51,7 @@ button { max-width: 100%; }
   .main { min-width: 0; }
   .topbar { position: sticky; top: 0; z-index: 15; }
   .topbar .network { flex: none; }
-  .content { width: 100%; max-width: none; padding: 20px 14px; }
+  .content { width: 100%; max-width: none; padding: 20px 16px; }
   .step-nav { gap: 6px; scrollbar-width: thin; }
   .step-nav button { min-width: 150px; justify-content: flex-start; }
   .form-grid { grid-template-columns: 1fr; gap: 16px; }
@@ -100,7 +100,7 @@ button { max-width: 100%; }
 
 /* Official emblem remains visible when the sidebar is collapsed on phones. */
 .mobile-brand { display: none; }
-@media (max-width: 800px) {
+@media (max-width: 900px) {
   .mobile-brand { display: flex; align-items: center; gap: 9px; min-width: 0; margin-right: auto; }
   .mobile-brand img { width: 38px; height: 40px; object-fit: contain; background: #fff; border-radius: 4px; }
   .mobile-brand strong { font-size: 13px; color: #17285b; line-height: 1.2; white-space: nowrap; }
