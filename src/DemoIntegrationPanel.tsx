@@ -2,9 +2,16 @@ import { useState } from 'react';
 import { Send, ShieldCheck, RefreshCw } from 'lucide-react';
 
 /** Intentional fictional-only demonstration: never sends saved officer surveys. */
-const OUTBOX_KEY = 'nimis-fictitious-demo-event-id';
+const OUTBOX_KEY = 'nimis-fictitious-demo-pending-v2';
+type Pending = { eventId: string; note: string };
+function readPending(): Pending | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(OUTBOX_KEY) || 'null') as Pending | null;
+    return value?.eventId && typeof value.note === 'string' ? value : null;
+  } catch { return null; }
+}
 export default function DemoIntegrationPanel() {
-  const [note, setNote] = useState('Fictional demonstration: canal condition checked');
+  const [note, setNote] = useState(() => readPending()?.note || 'Fictional demonstration: canal condition checked');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   async function send() {
@@ -12,11 +19,14 @@ export default function DemoIntegrationPanel() {
     setMessage('');
     try {
       // Reuse event ID on retries; keep it if network fails. Never send a real draft.
-      let eventId = localStorage.getItem(OUTBOX_KEY);
-      if (!eventId) {
-        eventId = crypto.randomUUID();
-        localStorage.setItem(OUTBOX_KEY, eventId);
+      let pending = readPending();
+      if (!pending) {
+        pending = { eventId: crypto.randomUUID(), note: note.trim() };
+        localStorage.setItem(OUTBOX_KEY, JSON.stringify(pending));
+      } else if (note !== pending.note) {
+        setNote(pending.note);
       }
+      const eventId = pending.eventId;
       const tokenResponse = await fetch('/api/v1/dev/token', {
         method: 'POST', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
@@ -29,7 +39,7 @@ export default function DemoIntegrationPanel() {
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + access_token },
         body: JSON.stringify({
           event_id: eventId, scheme_id: 'DEMO-SCHEME-001',
-          form_id: 'scheme_baseline', note: note.trim(),
+          form_id: 'scheme_baseline', note: pending.note,
         }),
       });
       if (!response.ok) {
