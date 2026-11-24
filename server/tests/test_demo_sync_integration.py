@@ -86,6 +86,13 @@ def test_collector_submission_and_district_decision(monkeypatch):
         admin_page = client.get("/api/v1/dev/integration/admin-inbox", headers=admin)
         assert admin_page.status_code == 200
         assert next(row for row in admin_page.json()["items"] if row["event_id"] == event_id)["status"] == "REVIEWED"
+        premature_publication = client.post(f"/api/v1/dev/integration/admin-inbox/{event_id}/decision",
+                                            json={"action": "PUBLISH"}, headers=admin)
+        assert premature_publication.status_code == 409
+        approval = client.post(f"/api/v1/dev/integration/admin-inbox/{event_id}/decision",
+                               json={"action": "TECH_APPROVE"}, headers=admin)
+        assert approval.status_code == 200, approval.text
+        assert approval.json()["status"] == "TECH_APPROVED"
         publication = client.post(f"/api/v1/dev/integration/admin-inbox/{event_id}/decision",
                                   json={"action": "PUBLISH"}, headers=admin)
         assert publication.status_code == 200, publication.text
@@ -99,7 +106,7 @@ def test_collector_submission_and_district_decision(monkeypatch):
                     "SELECT action FROM nimis_collect_demo.demo_decision WHERE event_id=%s ORDER BY decided_at",
                     (event_id,),
                 )
-                assert [row[0] for row in cursor.fetchall()] == ["VERIFY", "REVIEW", "PUBLISH"]
+                assert [row[0] for row in cursor.fetchall()] == ["VERIFY", "REVIEW", "TECH_APPROVE", "PUBLISH"]
     finally:
         with psycopg.connect(url) as conn:
             with conn.cursor() as cur:
