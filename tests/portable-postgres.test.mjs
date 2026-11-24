@@ -36,3 +36,13 @@ test('stopping local PostgreSQL preserves stored records', () => {
   assert.match(stop, /Database data preserved/);
   assert.doesNotMatch(stop, /Remove-Item|DROP DATABASE|TRUNCATE/);
 });
+
+
+test('portable installer creates only missing 64-hex sync password before sync role SQL',()=>{
+ assert.match(local,/if \(-not \$Values\.ContainsKey\('NIMIS_PG_SYNC_PASSWORD'\)\)/);
+ assert.match(local,/Add-Content -LiteralPath \$Secrets -Encoding ASCII/);
+ assert.match(local,/LOCAL_SYNC_PASSWORD_INVALID/);
+ assert.match(local,/004_local_sync_role\.sql/);
+ assert.ok(local.indexOf("if (-not $Values.ContainsKey('NIMIS_PG_SYNC_PASSWORD'))")<
+  local.indexOf("004_local_sync_role.sql"));
+});
