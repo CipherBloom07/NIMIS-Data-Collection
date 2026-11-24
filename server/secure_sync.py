@@ -41,6 +41,17 @@ class Operation(BaseModel):
             raise ValueError("captured_at must contain a timezone")
         return value
 
+    @field_validator("data")
+    @classmethod
+    def finite_json(cls, value: dict) -> dict:
+        # JSON spec disallows NaN/Infinity; never allow invalid values into
+        # PostgreSQL JSONB, which could otherwise turn one bad row into a 503.
+        try:
+            json.dumps(value, allow_nan=False)
+        except (TypeError, ValueError) as error:
+            raise ValueError("data must contain finite JSON values") from error
+        return value
+
     @field_validator("action")
     @classmethod
     def only_submit(cls, value: str) -> str:
@@ -93,11 +104,15 @@ def _actor(authorization: str | None = Header(default=None)) -> UUID:
         return UUID(claims["sub"])
     except (jwt.PyJWTError, ValueError, TypeError, KeyError) as error:
         raise HTTPException(401, detail="Invalid or expired identity") from error
+    except Exception:
+        # A JWKS timeout or DNS/TLS outage is an identity provider failure,
+        # not an internal error and never permission to use a demo credential.
+        raise HTTPException(503, detail="Identity verification temporarily unavailable") from None
 
 
 def _fingerprint(operation: Operation) -> str:
     value = operation.model_dump(mode="json", exclude_none=True)
-    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -107,7 +122,7 @@ def _accept_one(url: str, actor: UUID, operation: Operation) -> dict:
 
     result = {"event_id": str(operation.event_id)}
     fingerprint = _fingerprint(operation)
-    payload = json.dumps(operation.data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    payload = json.dumps(operation.data, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     if len(payload.encode("utf-8")) > 65536:
         return {**result, "outcome": "rejected", "detail": "Survey payload exceeds 64 KB"}
 
@@ -173,6 +188,8 @@ def secure_push(body: PushBatch, actor: UUID = Depends(_actor)):
         raise HTTPException(403, detail="Operation user or device mismatch")
     if len({op.event_id for op in body.operations}) != len(body.operations):
         raise HTTPException(422, detail="Duplicate event IDs within one batch")
+    if len({op.local_sequence for op in body.operations}) != len(body.operations):
+        raise HTTPException(422, detail="Duplicate device sequences within one batch")
     results = []
     try:
         for operation in body.operations:
