@@ -10,7 +10,7 @@ export default function BrandLogo({ className = '', compact = false }: {
   const [fallback, setFallback] = useState(false);
   const [failed, setFailed] = useState(false);
   const prefix = import.meta.env.BASE_URL;
-  const source = prefix + (fallback ? 'zimbabwe-coat-of-arms.svg' : 'zimbabwe-coat-of-arms.jpg');
+  const source = prefix + (fallback ? 'zimbabwe-coat-of-arms.svg' : 'nimis-logo.png');
 
   if (failed) return <span className={'brand-logo-text ' + className} aria-label="NIMIS official identity">
     NIMIS

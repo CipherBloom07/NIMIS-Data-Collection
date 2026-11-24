@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS nimis_collect_demo.field_submission (
   form_id text NOT NULL DEFAULT 'scheme_baseline',
   payload jsonb NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
   submitted_at timestamptz NOT NULL DEFAULT now(),
-  status text NOT NULL DEFAULT 'SUBMITTED' CHECK (status IN ('SUBMITTED','VERIFIED','REVIEWED','PUBLISHED','RETURNED')),
+  status text NOT NULL DEFAULT 'SUBMITTED' CHECK (status IN ('SUBMITTED','VERIFIED','REVIEWED','TECH_APPROVED','PUBLISHED','RETURNED')),
   reviewed_at timestamptz,
   reviewed_by uuid,
   review_note text,
@@ -41,7 +41,7 @@ REVOKE ALL ON nimis_collect_demo.field_submission FROM PUBLIC;
 -- Update the status check in already-created local demonstration databases.
 ALTER TABLE nimis_collect_demo.field_submission DROP CONSTRAINT IF EXISTS field_submission_status_check;
 ALTER TABLE nimis_collect_demo.field_submission ADD CONSTRAINT field_submission_status_check
- CHECK (status IN ('SUBMITTED','VERIFIED','REVIEWED','PUBLISHED','RETURNED'));
+ CHECK (status IN ('SUBMITTED','VERIFIED','REVIEWED','TECH_APPROVED','PUBLISHED','RETURNED'));
 
 -- Immutable local demonstration decision history. This is not an official audit service.
 CREATE TABLE IF NOT EXISTS nimis_collect_demo.demo_decision (
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS nimis_collect_demo.demo_decision (
   event_id uuid NOT NULL REFERENCES nimis_collect_demo.field_submission(event_id),
   actor_user_id uuid NOT NULL REFERENCES nimis_collect_demo.officer(officer_id),
   actor_role text NOT NULL CHECK (actor_role IN ('district_officer','provincial_officer','admin')),
-  action text NOT NULL CHECK (action IN ('VERIFY','RETURN','REVIEW','PUBLISH')),
+  action text NOT NULL CHECK (action IN ('VERIFY','RETURN','REVIEW','TECH_APPROVE','PUBLISH')),
   reason text,
   decided_at timestamptz NOT NULL DEFAULT now(),
   CHECK (action <> 'RETURN' OR length(btrim(coalesce(reason,''))) > 0)

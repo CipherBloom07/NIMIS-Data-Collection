@@ -2,12 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, statSync } from 'node:fs';
 
-test('official coat of arms is a real JPEG, not nested SVG', () => {
-  const path = 'public/zimbabwe-coat-of-arms.jpg';
+test('official coat of arms PNG is a real PNG, not a malformed JPEG', () => {
+  const path = 'public/nimis-logo.png';
   const bytes = readFileSync(path);
-  assert.ok(bytes.length > 1000, 'emblem file should contain image data');
-  assert.equal(bytes[0], 0xff);
-  assert.equal(bytes[1], 0xd8);
+  assert.ok(bytes.length > 10000, 'emblem file should contain image data');
+  assert.deepEqual([...bytes.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   assert.ok(statSync(path).isFile());
 });
 

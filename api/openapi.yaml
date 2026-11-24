@@ -158,6 +158,82 @@ paths:
       summary: Propose a new scheme and get duplicate candidates; never creates master directly
       responses:
         '202': { description: Pending DIDO review with possible duplicate candidates }
+
+  /secure/sync/push:
+    post:
+      summary: Staging-only verified OIDC collector submit operations
+      description: Disabled by default. Requires enrolled device, approved form, canonical assigned scheme and signed OIDC identity. No attachments or workflow actions.
+      operationId: stagingSecurePush
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, operations]
+              properties:
+                device_id: { type: string, format: uuid }
+                operations:
+                  type: array
+                  minItems: 1
+                  maxItems: 25
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [event_id, record_id, user_id, device_id, scheme_id, form_id, form_version, local_sequence, captured_at, action, data]
+                    properties:
+                      event_id: { type: string, format: uuid }
+                      record_id: { type: string, format: uuid }
+                      user_id: { type: string, format: uuid }
+                      device_id: { type: string, format: uuid }
+                      scheme_id: { type: string }
+                      form_id: { type: string }
+                      form_version: { type: integer, minimum: 1 }
+                      local_sequence: { type: integer, minimum: 1 }
+                      captured_at: { type: string, format: date-time }
+                      action: { type: string, const: submit }
+                      data: { type: object }
+      responses:
+        '200': { description: Committed per-item results; accepted, duplicate, rejected or conflict }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /secure/district/submissions/{event_id}/decisions:
+    post:
+      summary: Staging-only idempotent district verification or return
+      description: Requires a signed district officer identity and an active assignment for the submitted scheme; self-review is denied. No national master record is modified.
+      operationId: stagingDistrictDecision
+      parameters:
+        - { in: path, name: event_id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision_id, action]
+              properties:
+                decision_id: { type: string, format: uuid }
+                action: { type: string, enum: [VERIFY, RETURN] }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200': { description: Committed decision or exact idempotent retry }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /secure/district/inbox:
+    get:
+      summary: Metadata-only staging district submissions visible to authenticated, scheme-scoped district officer
+      operationId: stagingDistrictInbox
+      responses:
+        '200': { description: Read-only submission metadata filtered through the authoritative assignment view }
+        '401': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }

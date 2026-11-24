@@ -25,9 +25,9 @@ body { background: var(--zw-cream); }
   align-items: center;
 }
 .logo-row img {
-  width: 66px;
-  height: 66px;
-  flex: 0 0 66px;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
   object-fit: contain;
   background: #fff;
   border: 1px solid #e2dfd2;
