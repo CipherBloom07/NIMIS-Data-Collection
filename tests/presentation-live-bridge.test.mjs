@@ -24,3 +24,11 @@ test('repaired PostgreSQL launcher retains only one executable body and protects
  assert.doesNotMatch(db,/\n\) \{\n\s+throw 'LOCAL_SYNC_PASSWORD_INVALID'/);
  assert.equal((db.match(/START_PHASE2_REFERENCE\.ps1/g)||[]).length,1);
 });
+
+test('collector one-command presentation launcher installs missing locked UI packages',()=>{
+ const ps=readFileSync('scripts/START_CONNECTED_COLLECTOR_PILOT.ps1','utf8');
+ assert.match(ps,/node_modules\\vite/);
+ assert.match(ps,/& npm ci/);
+ assert.match(ps,/COLLECTOR_NPM_INSTALL_FAILED/);
+ assert.match(ps,/--strictPort/);
+});
