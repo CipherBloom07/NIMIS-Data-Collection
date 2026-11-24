@@ -110,8 +110,9 @@ export async function completeInstitutionalSignIn():Promise<boolean>{
   const body:unknown=await response.json();
   if(!body||typeof body!=='object')throw new Error('Invalid identity token response');
   const value=body as Record<string,unknown>;
-  if(value.token_type!=='Bearer'||typeof value.access_token!=='string'||
-     !Number.isFinite(value.expires_in)||Number(value.expires_in)<30){
+  if(typeof value.token_type!=='string'||value.token_type.toLowerCase()!=='bearer'||
+     typeof value.access_token!=='string'||typeof value.expires_in!=='number'||
+     !Number.isFinite(value.expires_in)||value.expires_in<30){
     throw new Error('Identity provider did not issue a valid short-lived bearer token');
   }
   bindInstitutionalAccessToken(value.access_token);
