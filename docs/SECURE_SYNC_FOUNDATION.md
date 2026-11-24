@@ -43,3 +43,17 @@ Nothing starts unless the enable flag and **all** security configuration values 
 ## Testing gate
 
 Review tests for missing/invalid identity, unregistered device, revoked device, unassigned scheme, unapproved form, duplicate event, reused sequence, changed replay payload, concurrent retry, and service restart. None may be marked passed without executed evidence. No production merge/deploy is authorized.
+
+## District verification increment (review branch)
+
+The follow-up branch `feat/district-verification-v1` adds:
+
+- `server/postgres/006_district_review_REVIEW.sql`: a mutable review **state** projection and a separate append-only decision history; the captured operation row is never updated.
+- `POST /api/v1/secure/district/submissions/{event_id}/decisions`: district officer `VERIFY` or `RETURN`, requiring a reason for returns and a stable `decision_id` across retries.
+- Server-side scope and self-review denial, PostgreSQL row locking and atomic state/decision commits, so competing decisions on the same submission cannot both succeed.
+- A read-only district inbox that reports the server's review state.
+- Isolated PostgreSQL tests for permission boundaries, deduplication, competing decisions, idempotent retry, and device revocation.
+
+**Important sequencing:** apply migration 005 before 006 in a *disposable* staging database. A valid source of `nimis_sync.current_actor_scope` must be approved by ICT. The main NIMIS adapter adds `submitAuthorizedDistrictDecision`, but no live UI is wired until official login and auditing requirements have been approved.
+
+The endpoint does **not** implement returned correction resubmission, separate district permissions for an official national dataset, provincial/national approval, formal electronic signatures or secure Android storage. These remain release blockers.
