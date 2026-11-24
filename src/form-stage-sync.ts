@@ -193,3 +193,49 @@ export async function syncQueuedForms():Promise<{synced:number;remaining:number;
       attention:current.filter(x=>x.status==='attention').length};
   }finally{inFlight=false;}
 }
+
+/** Read server decisions for already acknowledged revisions, not guesses.
+ * A returned/revision-conflicted form stays on-device for correction.
+ */
+export async function refreshFormReviewStatuses():
+  Promise<{checked:number;updated:number;attention:number}> {
+  assertDev();
+  const acknowledged=(await listFormQueue())
+    .filter(item=>item.status==='synced'||(item.status==='attention'&&Boolean(item.server_status)))
+    .slice(-50);
+  let updated=0,checked=0,attention=0;
+  for(const row of acknowledged){
+    let result:Response;
+    try{
+      result=await fetch(BASE+'/sync/status/'+encodeURIComponent(row.payload.event_id),{
+        cache:'no-store',headers:collectorAuthorizationHeaders(),
+      });
+    }catch{break;}
+    if(result.status===401||result.status===403)break;
+    if(!result.ok)continue;
+    const body=await result.json().catch(()=>null);
+    if(!body||body.source!=='ISOLATED_DEVELOPMENT'||body.official!==false||
+       body.event_id!==row.payload.event_id||body.record_id!==row.record_id||
+       body.revision!==row.revision)continue;
+    checked++;
+    const state=String(body.status??'');
+    const accepted=new Set(['AWAITING_FORM_APPROVAL','EVIDENCE_PENDING',
+      'DISTRICT_VERIFIED','PROVINCIAL_REVIEWED','TECHNICAL_APPROVED','PUBLISHED',
+      'RETURNED','SCHEME_REVISION_CONFLICT']);
+    if(!accepted.has(state))continue;
+    const corrective=state==='RETURNED'||state==='SCHEME_REVISION_CONFLICT';
+    const reason=state==='RETURNED'?
+      (Array.isArray(body.decisions)?body.decisions:
+        []).filter((x:{action?:string;reason?:string})=>x.action==='RETURN')
+          .map((x:{reason?:string})=>x.reason??'').filter(Boolean).slice(-1)[0]??'Officer returned the submission':
+      state==='SCHEME_REVISION_CONFLICT'?'Scheme registry changed; request a new assignment revision':
+      state==='EVIDENCE_PENDING'?'Photo evidence is incomplete on the server':undefined;
+    const next:StageQueueItem={...row,server_status:state,
+      status:corrective?'attention':'synced',reason};
+    if(row.server_status!==next.server_status||row.status!==next.status||row.reason!==next.reason){
+      await putQueue(next);updated++;
+    }
+    if(corrective)attention++;
+  }
+  return {checked,updated,attention};
+}
