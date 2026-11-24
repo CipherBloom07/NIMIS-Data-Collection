@@ -60,7 +60,6 @@ def test_user_and_device_binding_precedes_database(monkeypatch):
     actor_id, device_id = uuid4(), uuid4()
     monkeypatch.setattr(secure_sync, "_config",
                         lambda: ("https://idp.invalid/", "api", "https://idp.invalid/jwks", "postgresql://not-connected"))
-    monkeypatch.setattr(secure_sync, "_actor", lambda: actor_id)
     original = app.dependency_overrides.copy()
     app.dependency_overrides[secure_sync._actor] = lambda: actor_id
     def never_call_database(*args, **kwargs):
