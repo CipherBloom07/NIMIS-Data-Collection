@@ -118,8 +118,8 @@ function Field({field,value,onChange}:{field:FormField;value:unknown;onChange:(v
     return <StructuredField field={field} value={value} onChange={onChange}/>;
   if(type==='reference_list'||type==='multi')
     return <label className="field"><span>{title} — one entry per line</span>
-      <textarea rows={3} value={Array.isArray(value)?value.join('\\n'):valueText(value)}
-        onChange={e=>onChange(e.target.value.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean))}/></label>;
+      <textarea rows={3} value={Array.isArray(value)?value.join('\n'):valueText(value)}
+        onChange={e=>onChange(e.target.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))}/></label>;
   if(type==='choice:gauge_visual_estimate'||type==='choice:SI87_B1_B2_B3_B4_SIRP_other'){
     const options=type==='choice:gauge_visual_estimate'
       ? ['gauge','visual','estimate']:['SI87','B1','B2','B3','B4','SIRP','other'];
