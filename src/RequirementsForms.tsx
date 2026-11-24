@@ -7,6 +7,7 @@ import {ClipboardList,MapPin,Camera,Save} from 'lucide-react';
 import catalogue from '../schemas/form-catalogue.v1.json';
 import {loadAssignedCoreSchemes,type CoreAssignedScheme} from './core-stage-sync';
 import {savePhoto} from './storage';
+import {validateRequirementsDraft} from './requirements-validation';
 
 type FormField={field_id:string;type:string;units:string|null;metadata:string[]};
 type FormDefinition={form_id:string;form_version:number;name:string;frequency:string;fields:FormField[]};
@@ -102,6 +103,7 @@ export default function RequirementsForms(){
   const [notice,setNotice]=useState('Draft-only catalogue. Do not enter sensitive or official data into an unapproved development system.');
   const [busy,setBusy]=useState(false);
   const form=forms.find(x=>x.form_id===formId)!;
+  const issues=validateRequirementsDraft(formId,answers,observed,source);
   useEffect(()=>{void listRecords().then(setRecords).catch(error=>setNotice('Local storage: '+String(error)))},[]);
   useEffect(()=>{void loadAssignedCoreSchemes().then(list=>{
     setSchemes(list);setSchemeId(list[0]?.scheme_id??'');
@@ -127,7 +129,7 @@ export default function RequirementsForms(){
       await putRecord(item);
       setRecordId(id);setRevision(item.revision);
       setRecords(await listRecords());
-      setNotice('Draft stored on this device. NOT synchronized — this form awaits reviewed server validation.');
+      setNotice('Offline draft saved with '+issues.length+' data-quality issue(s). NOT synchronized — Department-approved server validation is required.');
     }catch(error){setNotice('Saving failed. Keep this screen open: '+String(error))}
     finally{setBusy(false)}
   }
@@ -149,6 +151,11 @@ export default function RequirementsForms(){
       <label className="field"><span>Evidence source</span><input value={source} onChange={e=>setSource(e.target.value)}/></label>
     </div>
     <p><strong>Reporting frequency:</strong> {form.frequency}. Form dictionary is DRAFT; values and conditional rules require Department approval.</p>
+    <div role="status" className="form-validation"><strong>Preflight data quality:</strong> {issues.length} issue(s).
+      {issues.length>0&&<ul>{issues.slice(0,10).map((issue,index)=>
+        <li key={issue.field+index}>{issue.field}: {issue.message}</li>)}</ul>}
+      <p>Drafts can be saved with issues, but cannot be synchronized or published as verified records.</p>
+    </div>
     <div className="form-grid">
       {form.fields.map(field=><Field key={field.field_id} field={field} value={answers[field.field_id]}
         onChange={v=>setAnswers(old=>({...old,[field.field_id]:v}))}/>)}
