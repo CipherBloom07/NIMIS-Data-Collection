@@ -166,6 +166,16 @@ export default function RequirementsForms(){
     setSchemes(list);setSchemeId(list[0]?.scheme_id??'');
   }).catch(error=>setNotice('Main NIMIS Core scheme assignments unavailable: '+String(error)))},[sessionActive]);
   function fresh(next:string){setFormId(next);setAnswers({});setRecordId(null);setRevision(0)}
+  function startCorrection(row:StageQueueItem){
+    if(row.status!=='attention'||!['RETURNED','SCHEME_REVISION_CONFLICT'].includes(row.server_status??'')){
+      setNotice('Only an acknowledged returned or conflicted form can be corrected.');return;
+    }
+    const saved=records.find(record=>record.id===row.record_id);
+    if(!saved){setNotice('The original local draft is unavailable; do not create an unrelated replacement.');return;}
+    edit(saved);
+    setNotice('Correction for '+saved.form_id+': '+(row.reason??'review officer feedback')+
+      '. Update the fields, save as a NEW revision, then queue and synchronize it. The returned event remains in the audit history.');
+  }
   function edit(record:LocalRecord){
     setFormId(record.form_id);setSchemeId(record.scheme_id);setPeriod(record.period_code);
     setObserved(record.observed_at);setSource(record.source);setAnswers(structuredClone(record.answers));
@@ -221,7 +231,7 @@ export default function RequirementsForms(){
       const result=await refreshFormReviewStatuses();
       setQueue(await listFormQueue());
       setNotice('Officer review: '+result.checked+' receipts checked, '+result.updated+
-        ' status changes, '+result.attention+' returned or conflicted. Returned submissions need a corrected new draft revision.');
+        ' status changes, '+result.attention+' returned or conflicted. Use Correct returned form to save a new revision.');
     }catch(error){setNotice('Review lookup unavailable; saved receipts remain untouched: '+String(error))}
     finally{setBusy(false)}
   }
@@ -268,7 +278,7 @@ export default function RequirementsForms(){
       <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Sync test queue to NIMIS Core</button>
       <button className="secondary" disabled={busy||!queue.some(x=>x.status==='synced'||Boolean(x.server_status))}
         onClick={()=>void refreshReviews()}>Refresh officer decisions</button>
-      <span>Revision {revision} · No automatic upload or approval</span>
+      <span>Revision {revision} · Offline save first; sync and approval are separate actions</span>
     </div>
     <p role="status"><strong>Development queue:</strong> {queue.filter(x=>x.status==='pending').length} pending,
       {' '}{queue.filter(x=>x.status==='synced').length} acknowledged,
@@ -277,8 +287,13 @@ export default function RequirementsForms(){
     {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING').length>0&&
      <div role="status" className="form-validation"><strong>Collector follow-up required</strong>
       {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING')
-        .map(row=><p key={row.id}>{row.payload.form_id} · {row.payload.period_code} · {row.server_status??row.status}
-          {row.reason?': '+row.reason:''}</p>)}
+        .map(row=><div key={row.id} style={{padding:'8px 0'}}>
+          <p>{row.payload.form_id} · {row.payload.period_code} · {row.server_status??row.status}
+          {row.reason?': '+row.reason:''}</p>
+          {['RETURNED','SCHEME_REVISION_CONFLICT'].includes(row.server_status??'')&&
+            <button type="button" className="secondary" disabled={busy}
+              onClick={()=>startCorrection(row)}>Correct returned form</button>}
+        </div>)}
      </div>}
     {queue.some(x=>Boolean(x.server_status))&&
      <div><h3>Officer review status</h3>
