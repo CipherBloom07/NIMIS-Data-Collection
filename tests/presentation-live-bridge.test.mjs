@@ -17,7 +17,7 @@ test('connected collector checks actual local Core and retransmits only queued w
 });
 test('repaired PostgreSQL launcher retains only one executable body and protects data',()=>{
  assert.match(db,/NIMIS_PG_ADMIN_PASSWORD/);
- assert.match(db,/if \(\$Line -match '\^\(\[A-Z_\]\+\)=\(\.\+\)\$'\)/);
+ assert.ok(db.includes("if ($Line -match '^([A-Z_]+)=(.+)$')"));
  assert.match(db,/DATA_DIRECTORY_NOT_EMPTY/);
  assert.match(db,/PG_VERSION/);
  assert.match(db,/START_PHASE2_REFERENCE.ps1/);
