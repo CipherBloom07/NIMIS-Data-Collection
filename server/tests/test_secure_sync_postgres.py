@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from server.reference_app import app
-from server import secure_sync
+from server import secure_sync, secure_review
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -75,11 +75,11 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
         app.dependency_overrides[secure_sync._actor] = lambda: actor
         return original
 
-    monkeypatch.setattr(
-        secure_sync, "_config",
-        lambda: ("https://ci.example.invalid/", "test-api",
-                 "https://ci.example.invalid/jwks.json", url),
-    )
+    def isolated_configuration():
+        return ("https://ci.example.invalid/", "test-api",
+                "https://ci.example.invalid/jwks.json", url)
+    monkeypatch.setattr(secure_sync, "_config", isolated_configuration)
+    monkeypatch.setattr(secure_review, "_config", isolated_configuration)
     client = TestClient(app)
 
     try:
