@@ -38,7 +38,11 @@ try {
     throw "Collector port $CollectorPort already in use. Nothing was stopped. Choose another -CollectorPort."
   }
   if (-not (Test-Path (Join-Path $Root 'node_modules\vite'))) {
-    throw 'Missing collector npm dependencies. From the collector folder run npm ci first.'
+    Write-Host 'COLLECTOR_PACKAGES: installing pinned dependencies for first launch' -ForegroundColor Cyan
+    & npm ci
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $Root 'node_modules\vite'))) {
+      throw 'COLLECTOR_NPM_INSTALL_FAILED: verify Node.js/npm and package-lock.json'
+    }
   }
   Write-Host 'DATA_SAFETY: Existing IndexedDB survey drafts, photos, local outbox untouched.'
   Write-Host 'PILOT_NOTE: Main Core requires the seeded fictional collector assignment before a scheme appears.'
