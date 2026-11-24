@@ -40,6 +40,8 @@ def test_collector_submission_and_district_decision(monkeypatch):
 
     collector = jwt_for("officer.demo")
     district = jwt_for("district.demo")
+    provincial = jwt_for("provincial.demo")
+    admin = jwt_for("admin.demo")
     event_id = str(uuid4())
     body = {"event_id": event_id, "scheme_id": "DEMO-SCHEME-001",
             "form_id": "scheme_baseline", "note": "Fictional canal inspection, no real observations"}
@@ -70,10 +72,39 @@ def test_collector_submission_and_district_decision(monkeypatch):
         assert decision.json()["status"] == "VERIFIED"
         assert client.post(f"/api/v1/dev/integration/district-inbox/{event_id}/decision",
                            json={"action": "RETURN", "reason": "again"}, headers=district).status_code == 409
+        assert client.get("/api/v1/dev/integration/provincial-inbox", headers=collector).status_code == 403
+        province_page = client.get("/api/v1/dev/integration/provincial-inbox", headers=provincial)
+        assert province_page.status_code == 200, province_page.text
+        assert next(row for row in province_page.json()["items"] if row["event_id"] == event_id)["status"] == "VERIFIED"
+        assert client.post(f"/api/v1/dev/integration/provincial-inbox/{event_id}/decision",
+                           json={"action": "PUBLISH"}, headers=provincial).status_code == 422
+        province_review = client.post(f"/api/v1/dev/integration/provincial-inbox/{event_id}/decision",
+                                      json={"action": "REVIEW"}, headers=provincial)
+        assert province_review.status_code == 200, province_review.text
+        assert province_review.json()["status"] == "REVIEWED"
+        assert client.get("/api/v1/dev/integration/admin-inbox", headers=provincial).status_code == 403
+        admin_page = client.get("/api/v1/dev/integration/admin-inbox", headers=admin)
+        assert admin_page.status_code == 200
+        assert next(row for row in admin_page.json()["items"] if row["event_id"] == event_id)["status"] == "REVIEWED"
+        publication = client.post(f"/api/v1/dev/integration/admin-inbox/{event_id}/decision",
+                                  json={"action": "PUBLISH"}, headers=admin)
+        assert publication.status_code == 200, publication.text
+        assert publication.json()["status"] == "PUBLISHED"
+        assert publication.json()["publication"] == "demo_only"
+        assert client.post(f"/api/v1/dev/integration/admin-inbox/{event_id}/decision",
+                           json={"action": "PUBLISH"}, headers=admin).status_code == 409
+        with psycopg.connect(url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT action FROM nimis_collect_demo.demo_decision WHERE event_id=%s ORDER BY decided_at",
+                    (event_id,),
+                )
+                assert [row[0] for row in cursor.fetchall()] == ["VERIFY", "REVIEW", "PUBLISH"]
     finally:
         with psycopg.connect(url) as conn:
             with conn.cursor() as cur:
                 # Remove only this test's synthetic event, never another submission.
+                cur.execute("DELETE FROM nimis_collect_demo.demo_decision WHERE event_id=%s", (event_id,))
                 cur.execute("DELETE FROM nimis_collect_demo.field_submission WHERE event_id=%s", (event_id,))
 
 
