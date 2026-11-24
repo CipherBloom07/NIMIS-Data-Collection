@@ -230,3 +230,8 @@ app.include_router(demo_integration_router)
 
 from server.demo_review_stages import router as demo_review_router
 app.include_router(demo_review_router)
+
+# Optional staging adapter: disabled unless approved OIDC and registry settings exist.
+# Intentionally separate from /api/v1/dev/integration and its fictional accounts.
+from server.secure_sync import router as secure_sync_router
+app.include_router(secure_sync_router)
