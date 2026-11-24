@@ -21,6 +21,20 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
+      - name: Validate local PowerShell launch syntax
+        shell: pwsh
+        run: |
+          $scripts = @('scripts/START_POSTGRES_LOCAL.ps1', 'scripts/START_CONNECTED_COLLECTOR_PILOT.ps1')
+          foreach ($path in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path,[ref]$tokens,[ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              foreach ($error in $errors) { Write-Error "$path : $error" }
+              throw "PowerShell syntax validation failed: $path"
+            }
+            Write-Host "POWERSHELL_PARSE_PASS: $path"
+          }
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
