@@ -36,9 +36,31 @@ export function validateRequirementsDraft(
         (type==='integer'&&!Number.isInteger(Number(value))))){
       issues.push({field:field.field_id,message:'Enter a finite non-negative'+(type==='integer'?' whole number':' measurement')});
     }
-    if((type==='photo'||type==='attachments')&&
-       (typeof value!=='string'&&!Array.isArray(value))){
-      issues.push({field:field.field_id,message:'Photographs must have saved local IDs'});
+    if((type==='photo'||type==='attachments')){
+      const ids=Array.isArray(value)?value:[value];
+      if(ids.length>30||ids.some(x=>typeof x!=='string'||!
+         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x))){
+        issues.push({field:field.field_id,message:'Photographs must reference saved UUIDs (maximum 30)'});
+      }
+    }
+    if((type==='uuid'||type==='reference_or_uuid')&&type==='uuid'&&
+       (typeof value!=='string'||!
+         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))){
+      issues.push({field:field.field_id,message:'Enter a valid UUID'});
+    }
+    if(type==='date'&&(typeof value!=='string'||!
+       /^\\d{4}-\\d{2}-\\d{2}$/.test(value)||!
+       Number.isFinite(new Date(value+'T00:00:00Z').getTime()))){
+      issues.push({field:field.field_id,message:'Enter a valid YYYY-MM-DD date'});
+    }
+    const choices:Record<string,string[]>={
+      'choice:yes_no':['Yes','No'],
+      'choice:good_moderate_bad':['Good','Moderate','Bad'],
+      'choice:gauge_visual_estimate':['gauge','visual','estimate'],
+      'choice:SI87_B1_B2_B3_B4_SIRP_other':['SI87','B1','B2','B3','B4','SIRP','other']
+    };
+    if(type in choices&&!choices[type].includes(String(value))){
+      issues.push({field:field.field_id,message:'Select one of the approved pilot choices'});
     }
   }
   for(const [key,value] of Object.entries(answers)){
@@ -78,8 +100,12 @@ export function validateRequirementsDraft(
   for(const k of ['storage_percent','progress_percent']){
     if(values[k]!==undefined&&values[k]!>100)issues.push({field:k,message:'Percentage cannot exceed 100'});
   }
-  if(formId==='new_scheme_request'&&!answers.scheme_name){
-    issues.push({field:'scheme_name',message:'A proposed scheme needs a name'});
+  if(formId==='new_scheme_request'){
+    for(const field of ['scheme_name','province','district']){
+      if(typeof answers[field]!=='string'||!(answers[field] as string).trim()){
+        issues.push({field,message:'A proposed scheme needs a name, province and district'});
+      }
+    }
   }
   return issues;
 }
