@@ -84,11 +84,16 @@ if (-not (Test-Path -LiteralPath $Secrets)) {
 }
 $Values = @{}
 foreach ($Line in Get-Content -LiteralPath $Secrets) {
-    if ($Line -match '^([A-Z_]+)=(.+)['NIMIS_PG_ADMIN_PASSWORD'] -notmatch '^[a-f0-9]{64}$' -or
+    if ($Line -match '^([A-Z_]+)=(.+)$') {
+        $Values[$Matches[1]] = $Matches[2]
+    }
+}
+if (-not $Values.ContainsKey('NIMIS_PG_ADMIN_PASSWORD') -or
+    -not $Values.ContainsKey('NIMIS_PG_PASSWORD') -or
+    $Values['NIMIS_PG_ADMIN_PASSWORD'] -notmatch '^[a-f0-9]{64}$' -or
     $Values['NIMIS_PG_PASSWORD'] -notmatch '^[a-f0-9]{64}$') {
     throw 'LOCAL_SECRETS_INVALID: Do not overwrite credentials for an existing database.'
 }
-
 if (-not (Test-Path -LiteralPath (Join-Path $Data 'PG_VERSION'))) {
     if (Test-Path -LiteralPath $Data) {
         if (@(Get-ChildItem -LiteralPath $Data -Force).Count -gt 0) {
