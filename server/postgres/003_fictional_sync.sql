@@ -1,5 +1,15 @@
 -- Fictional-only integration demonstration. Run only in nimis_collect_dev.
 -- This does not alter the main NIMIS master tables.
+-- Upgrade the fictional role check for existing local PostgreSQL clusters.
+ALTER TABLE nimis_collect_demo.officer DROP CONSTRAINT IF EXISTS officer_role_code_check;
+ALTER TABLE nimis_collect_demo.officer ADD CONSTRAINT officer_role_code_check
+ CHECK (role_code IN ('field_officer','scheme_manager','dido','pido','district_officer'));
+INSERT INTO nimis_collect_demo.officer(officer_id,role_code)
+VALUES ('10000000-0000-4000-8000-000000000002','district_officer')
+ON CONFLICT (officer_id) DO UPDATE SET role_code='district_officer';
+INSERT INTO nimis_collect_demo.assignment(officer_id,scheme_id,role_code)
+VALUES ('10000000-0000-4000-8000-000000000002','DEMO-SCHEME-001','dido')
+ON CONFLICT (officer_id,scheme_id,role_code) DO NOTHING;
 CREATE TABLE IF NOT EXISTS nimis_collect_demo.field_submission (
   event_id uuid PRIMARY KEY,
   scheme_id text NOT NULL REFERENCES nimis_collect_demo.scheme(scheme_id),
