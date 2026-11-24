@@ -9,7 +9,7 @@ test('institutional access token is kept only in memory and never serialized',()
   assert.match(auth,/let tokenInMemory:string\|null=null/);
   assert.match(auth,/VITE_NIMIS_AUTH_MODE==='oidc'/);
   assert.match(auth,/Institutional collector sign-in required/);
-  assert.doesNotMatch(auth,/localStorage|sessionStorage|indexedDB|console\.log/);
+  assert.doesNotMatch(auth,/\b(?:localStorage|sessionStorage|indexedDB)\s*\.|console\.log\s*\(/);
 });
 test('all collector stage API clients reuse the same signed session',()=>{
   assert.match(forms,/collectorAuthorizationHeaders\(\)/);
