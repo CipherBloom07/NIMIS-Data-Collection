@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 from uuid import UUID
+from urllib.parse import urlparse
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -29,9 +30,15 @@ def enabled(request: Request) -> None:
 
 
 def connection():
+    database_url = os.environ.get("NIMIS_COLLECT_SYNC_DATABASE_URL", "")
+    location = urlparse(database_url)
+    if (location.hostname not in ("localhost", "127.0.0.1")
+            or location.path.strip("/") != "nimis_collect_dev"
+            or location.scheme not in ("postgresql", "postgres")):
+        raise HTTPException(503, detail="Integration requires isolated local fictional database")
     try:
         import psycopg
-        return psycopg.connect(os.environ["NIMIS_COLLECT_SYNC_DATABASE_URL"], connect_timeout=5)
+        return psycopg.connect(database_url, connect_timeout=5)
     except Exception:
         raise HTTPException(503, detail="Fictional PostgreSQL integration unavailable") from None
 
