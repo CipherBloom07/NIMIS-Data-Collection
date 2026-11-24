@@ -94,6 +94,16 @@ if (-not $Values.ContainsKey('NIMIS_PG_ADMIN_PASSWORD') -or
     $Values['NIMIS_PG_PASSWORD'] -notmatch '^[a-f0-9]{64}$') {
     throw 'LOCAL_SECRETS_INVALID: Do not overwrite credentials for an existing database.'
 }
+# A distinct fictional sync role needs a random credential, but never rotate existing secrets.
+if (-not $Values.ContainsKey('NIMIS_PG_SYNC_PASSWORD')) {
+    $SyncPassword = New-RandomSecret
+    Add-Content -LiteralPath $Secrets -Encoding ASCII -Value "NIMIS_PG_SYNC_PASSWORD=$SyncPassword"
+    $Values['NIMIS_PG_SYNC_PASSWORD'] = $SyncPassword
+    Write-Host 'LOCAL_SYNC_PASSWORD: CREATED' -ForegroundColor Green
+}
+if ($Values['NIMIS_PG_SYNC_PASSWORD'] -notmatch '^[a-f0-9]{64}$') {
+    throw 'LOCAL_SYNC_PASSWORD_INVALID: existing secrets preserved'
+}
 if (-not (Test-Path -LiteralPath (Join-Path $Data 'PG_VERSION'))) {
     if (Test-Path -LiteralPath $Data) {
         if (@(Get-ChildItem -LiteralPath $Data -Force).Count -gt 0) {
