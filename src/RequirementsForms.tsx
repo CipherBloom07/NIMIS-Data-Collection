@@ -265,8 +265,9 @@ export default function RequirementsForms(){
       await putRecord(item);
       setRecordId(id);setRevision(item.revision);
       setRecords(await listRecords());
-      setNotice('Offline draft saved with '+issues.length+' data-quality issue(s). NOT synchronized — Department-approved server validation is required.');
-    }catch(error){setNotice('Saving failed. Keep this screen open: '+String(error))}
+      setNotice('Survey saved on this device. Use Send to District to queue it, or keep editing offline.');
+      return item;
+    }catch(error){setNotice('Saving failed. Keep this screen open: '+String(error));return undefined;}
     finally{setBusy(false)}
   }
   async function enqueue(){
@@ -281,6 +282,36 @@ export default function RequirementsForms(){
       setNotice('Saved revision queued for ISOLATED fictional NIMIS Core. Event '+item.payload.event_id+' retained until acknowledged.');
     }catch(error){setNotice('Not queued: '+String(error))}
     finally{setBusy(false)}
+  }
+  /** Single-action presentation workflow. Offline means QUEUED, not sent. */
+  async function saveAndSubmit(){
+    if(issues.length){
+      setNotice('Correct '+issues.length+' data-quality issue(s) before submitting to District.');
+      return;
+    }
+    const saved=await save();
+    if(!saved)return;
+    setBusy(true);
+    try{
+      await queueSavedForm(saved,saved.base_scheme_revision);
+      if(bridgeState==='connected'&&navigator.onLine){
+        try{await syncQueuedForms()}catch{
+          // The exact event remains safely pending; never invent receipt.
+        }
+      }
+      const next=await listFormQueue();
+      setQueue(next);
+      const receipt=next.find(row=>row.id===saved.id+':'+saved.revision);
+      if(receipt?.status==='synced'){
+        setNotice('Survey received by NIMIS Core. District Officer can review it now. Receipt '+receipt.payload.event_id);
+      }else if(receipt?.status==='attention'){
+        setNotice('Survey saved, but Core requires attention: '+(receipt.reason||'review the fields'));
+      }else{
+        setNotice('Survey saved and queued safely on this device. Core is offline or busy; synchronization retries on reconnection. Do not clear browser storage.');
+      }
+    }catch(error){
+      setNotice('Survey saved offline. Could not queue/send: '+String(error)+'. Use Queue saved revision to retry.');
+    }finally{setBusy(false)}
   }
   async function upload(){
     setBusy(true);
@@ -363,9 +394,11 @@ export default function RequirementsForms(){
         onChange={v=>setAnswers(old=>({...old,[field.field_id]:v}))}/>)}
     </div>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'16px 0'}}>
-      <button className="primary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={18}/> Save offline draft</button>
-      <button className="secondary" disabled={busy||issues.length>0||!recordId} onClick={()=>void enqueue()}>Queue saved revision (fictional test)</button>
-      <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Sync test queue to NIMIS Core</button>
+      <button className="primary" disabled={busy||issues.length>0||(!schemeId&&form.form_id!=='new_scheme_request')}
+        onClick={()=>void saveAndSubmit()}><Save size={18}/> Save and send to District</button>
+      <button className="secondary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={17}/> Save offline only</button>
+      <button className="secondary" disabled={busy||issues.length>0||!recordId} onClick={()=>void enqueue()}>Queue saved revision</button>
+      <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Retry queued uploads</button>
       <button className="secondary" disabled={busy||!queue.some(x=>x.status==='synced'||Boolean(x.server_status))}
         onClick={()=>void refreshReviews()}>Refresh officer decisions</button>
       <span>Revision {revision} · Offline save first; sync and approval are separate actions</span>
