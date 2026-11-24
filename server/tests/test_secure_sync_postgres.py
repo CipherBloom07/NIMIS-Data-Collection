@@ -38,8 +38,10 @@ def test_staging_secure_sync_idempotency_scope_and_revocation(monkeypatch):
     # This disposable test creates the ICT-supplied view ONLY in the throwaway
     # CI database. The staging migration does not create any scope source.
     ddl = Path("server/postgres/005_secure_sync_foundation_REVIEW.sql").read_text(encoding="utf-8")
+    review_ddl = Path("server/postgres/006_district_review_REVIEW.sql").read_text(encoding="utf-8")
     with psycopg.connect(url, autocommit=True) as conn:
         conn.execute(ddl)
+        conn.execute(review_ddl)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS nimis_sync.test_actor_scope (
                  user_id uuid NOT NULL, scheme_id text NOT NULL, role text NOT NULL,
