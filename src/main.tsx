@@ -1,11 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import MobileCollector from './MobileCollector';
 import {completeInstitutionalSignIn} from './oidc-session';
 
 function mount(){
   ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode><App/></React.StrictMode>
+    <React.StrictMode>{new URLSearchParams(location.search).has('legacy')?<App/>:<MobileCollector/>}</React.StrictMode>
   );
 }
 const query=new URLSearchParams(location.search);
