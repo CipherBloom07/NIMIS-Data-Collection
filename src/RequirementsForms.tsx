@@ -156,12 +156,30 @@ export default function RequirementsForms(){
     void listFormQueue().then(setQueue).catch(error=>setNotice('Pilot queue: '+String(error)));
   },[]);
   useEffect(()=>{
-    const retry=()=>{void syncQueuedForms().then(()=>{
-      void listFormQueue().then(setQueue);
-    }).catch(()=>{})};
+    // A collector explicitly queued these events earlier. Resume only
+    // already-queued work when the device is connected and the signed-in
+    // institutional session (when required) is active.
+    if(!import.meta.env.DEV)return;
+    const authorized=()=>import.meta.env.VITE_NIMIS_AUTH_MODE!=='oidc'||institutionalSessionIsActive();
+    const retry=()=>{
+      if(!navigator.onLine||!authorized())return;
+      void syncQueuedForms().then(()=>refreshFormReviewStatuses()).then(()=>{
+        void listFormQueue().then(setQueue);
+      }).catch(()=>{
+        void listFormQueue().then(setQueue).catch(()=>{});
+      });
+    };
+    const foreground=()=>{if(document.visibilityState==='visible')retry()};
     window.addEventListener('online',retry);
-    return()=>window.removeEventListener('online',retry);
-  },[]);
+    window.addEventListener('focus',retry);
+    document.addEventListener('visibilitychange',foreground);
+    retry();
+    return()=>{
+      window.removeEventListener('online',retry);
+      window.removeEventListener('focus',retry);
+      document.removeEventListener('visibilitychange',foreground);
+    };
+  },[sessionActive]);
   useEffect(()=>{void loadAssignedCoreSchemes().then(list=>{
     setSchemes(list);setSchemeId(list[0]?.scheme_id??'');
   }).catch(error=>setNotice('Main NIMIS Core scheme assignments unavailable: '+String(error)))},[sessionActive]);
