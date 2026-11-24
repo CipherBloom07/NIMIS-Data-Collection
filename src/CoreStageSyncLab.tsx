@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useState} from 'react';
 import {AlertTriangle,CloudUpload,Database,RefreshCw,Save,ShieldCheck,WifiOff} from 'lucide-react';
-import {addStageOperation,DEMO_SCHEME,listStageOperations,syncStageOperations,type StageOperation} from './core-stage-sync';
+import {addStageOperation,DEMO_SCHEME,listStageOperations,pullStageStatuses,syncStageOperations,type StageOperation} from './core-stage-sync';
 
 const periodNow=()=>new Date().toISOString().slice(0,7);
 export default function CoreStageSyncLab(){
@@ -32,6 +32,16 @@ export default function CoreStageSyncLab(){
     window.addEventListener('offline',off);
     return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off)};
   },[sync]);
+  async function pullStatus(){
+    if(busy)return;
+    setBusy(true);
+    try{
+      const report=await pullStageStatuses();
+      await refresh();
+      setMessage('Status pull: '+report.updated+' fictional submissions updated; '+report.errors+' unavailable. History retained.');
+    }catch(error){setMessage('Status pull unavailable: '+String(error))}
+    finally{setBusy(false)}
+  }
   async function capture(){
     if(busy)return;
     setBusy(true);
@@ -84,6 +94,7 @@ export default function CoreStageSyncLab(){
       <button type="button" className="secondary" disabled={busy||pending===0||!online} onClick={()=>void sync()}>
         {online?<CloudUpload size={16}/>:<WifiOff size={16}/>} Sync test queue</button>
       <button type="button" className="secondary" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={16}/> Refresh status</button>
+      <button type="button" className="secondary" disabled={busy||!online||!rows.some(row=>row.state==='synced')} onClick={()=>void pullStatus()}><ShieldCheck size={16}/> Pull officer decisions</button>
     </div>
     <p role="status" style={{padding:'5px 14px',fontWeight:650}}>{message}</p>
     <div className="panel-title"><div><h3>Retained fictional event history</h3>
