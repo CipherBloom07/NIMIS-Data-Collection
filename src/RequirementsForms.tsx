@@ -151,6 +151,12 @@ export default function RequirementsForms(){
   const [sessionActive,setSessionActive]=useState(institutionalSessionIsActive());
   const form=forms.find(x=>x.form_id===formId)!;
   const issues=validateRequirementsDraft(formId,answers,observed,source);
+  const savedCurrent=records.find(row=>row.id===recordId&&row.revision===revision);
+  const hasUnsavedChanges=!savedCurrent||
+    savedCurrent.form_id!==formId||savedCurrent.scheme_id!==(formId==='new_scheme_request'?'':schemeId)||
+    savedCurrent.period_code!==period||savedCurrent.observed_at!==observed||
+    savedCurrent.source!==source||
+    JSON.stringify(savedCurrent.answers)!==JSON.stringify(answers);
   useEffect(()=>{
     void listRecords().then(setRecords).catch(error=>setNotice('Local storage: '+String(error)));
     void listFormQueue().then(setQueue).catch(error=>setNotice('Pilot queue: '+String(error)));
@@ -171,6 +177,21 @@ export default function RequirementsForms(){
     setObserved(record.observed_at);setSource(record.source);setAnswers(structuredClone(record.answers));
     setRecordId(record.id);setRevision(record.revision);
     setNotice('Opened preserved local draft. Changes are not sent to NIMIS.');
+  }
+  function correctSubmission(item:StageQueueItem){
+    const saved=records.find(record=>record.id===item.record_id);
+    if(!saved){
+      setNotice('This record was not found in local drafts. Its immutable submission is preserved; do not clear browser storage.');return;
+    }
+    if(saved.revision<item.revision){
+      setNotice('Local draft revision is older than the acknowledged submission; record preserved. Restore the latest saved record before editing.');return;
+    }
+    edit(saved);
+    if(saved.revision>item.revision){
+      setNotice('A newer draft revision already exists. Opened that draft to avoid overwriting later changes. Review and save before re-queuing.');
+    }else{
+      setNotice('Opened the returned or conflicted form. Correct its values, then Save offline draft to create revision '+(saved.revision+1)+'. Original submission remains in the audit trail.');
+    }
   }
   async function save(){
     if(busy)return;
@@ -194,7 +215,9 @@ export default function RequirementsForms(){
   }
   async function enqueue(){
     const saved=records.find(row=>row.id===recordId&&row.revision===revision);
-    if(!saved){setNotice('Save the current form revision first.');return;}
+    if(!saved||hasUnsavedChanges){
+      setNotice('Save your current form changes before queuing; unsaved values must never be substituted with an older revision.');return;
+    }
     const check=validateRequirementsDraft(saved.form_id,saved.answers,saved.observed_at,saved.source);
     if(check.length){setNotice('Resolve '+check.length+' data quality issue(s) before test queueing.');return;}
     setBusy(true);
@@ -264,11 +287,11 @@ export default function RequirementsForms(){
     </div>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'16px 0'}}>
       <button className="primary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={18}/> Save offline draft</button>
-      <button className="secondary" disabled={busy||issues.length>0||!recordId} onClick={()=>void enqueue()}>Queue saved revision (fictional test)</button>
+      <button className="secondary" disabled={busy||issues.length>0||!recordId||hasUnsavedChanges} onClick={()=>void enqueue()}>Queue saved revision (fictional test)</button>
       <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Sync test queue to NIMIS Core</button>
       <button className="secondary" disabled={busy||!queue.some(x=>x.status==='synced'||Boolean(x.server_status))}
         onClick={()=>void refreshReviews()}>Refresh officer decisions</button>
-      <span>Revision {revision} · No automatic upload or approval</span>
+      <span>Revision {revision} · {hasUnsavedChanges?'Unsaved changes — save before syncing':'Saved locally'} · No automatic approval</span>
     </div>
     <p role="status"><strong>Development queue:</strong> {queue.filter(x=>x.status==='pending').length} pending,
       {' '}{queue.filter(x=>x.status==='synced').length} acknowledged,
@@ -277,8 +300,12 @@ export default function RequirementsForms(){
     {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING').length>0&&
      <div role="status" className="form-validation"><strong>Collector follow-up required</strong>
       {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING')
-        .map(row=><p key={row.id}>{row.payload.form_id} · {row.payload.period_code} · {row.server_status??row.status}
-          {row.reason?': '+row.reason:''}</p>)}
+        .map(row=><div key={row.id} style={{padding:'8px 0'}}>
+          <p>{row.payload.form_id} · {row.payload.period_code} · {row.server_status??row.status}
+          {row.reason?': '+row.reason:''}</p>
+          {row.status==='attention'&&<button type="button" className="secondary"
+            disabled={busy} onClick={()=>correctSubmission(row)}>Open for correction</button>}
+        </div>)}
      </div>}
     {queue.some(x=>Boolean(x.server_status))&&
      <div><h3>Officer review status</h3>
