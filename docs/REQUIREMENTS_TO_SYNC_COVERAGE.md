@@ -45,3 +45,11 @@ The original mWater form asks for demographics, GPS and photograph; officer cont
 ## Acceptance test needed
 
 Do not authorize production sync until a real assigned collector can capture each required dataset offline, retain photos/GPS and edits through interruption, reconnect to one authenticated backend and receive durable per-item acknowledgements; a district officer can verify, province can review and delegated national technical staff can approve, admin can publish; and the expected time-scoped figures, source records and evidence appear in each of the seven main NIMIS modules **without duplicate scheme records**.
+
+## Follow-up: connected **fictional staging** form transport
+
+The paired review branch `CipherBloom07/NIMIS:feat/collector-field-form-staging-contract` now exposes a dedicated **development-only** generic form intake and a geographically scoped metadata inbox. Collector `src/form-stage-sync.ts` persists exact saved revisions and replay-stable event IDs in an IndexedDB test queue; the UI requires explicit queueing and can attempt retries when the network returns.
+
+**This does not constitute live NIMIS sync.** Receipts remain `AWAITING_FORM_APPROVAL` or `EVIDENCE_PENDING`, never `PUBLISHED`. Only JSON field answers and GPS metadata transfer; referenced photo blobs stay on the collector device. The eleven form definitions are still draft, and individual Ministry accounts, secure storage, official evidence upload, approved conditional forms, correction histories, technical sign-off and reporting mappings remain outstanding.
+
+To exercise both apps, run the **paired review branches** against the isolated local `nimis_core_dev` database and synthetic test identities only. Main NIMIS installed/deployed code and real data are unchanged.
