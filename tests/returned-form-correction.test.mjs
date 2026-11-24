@@ -9,7 +9,7 @@ test('returned forms must reopen preserved drafts, not overwrite a submitted eve
   assert.match(ui,/function startCorrection\(row:StageQueueItem\)/);
   assert.match(ui,/edit\(saved\)/);
   assert.match(ui,/Correct returned form/);
-  assert.match(ui,/new draft revision/);
+  assert.match(ui,/save a new revision/);
   assert.match(sync,/record\.id\+'\:\'\+record\.revision/);
   assert.match(sync,/event_id:crypto\.randomUUID\(\)/);
 });
