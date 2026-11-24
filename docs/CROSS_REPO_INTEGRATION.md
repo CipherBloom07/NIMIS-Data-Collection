@@ -48,7 +48,7 @@ Terminal C, **separate main NIMIS clone** (not the collector folder):
 
 ```powershell
 cd "C:\Users\2025\Desktop"
-git clone --branch feat/collector-district-integration https://github.com/CipherBloom07/NIMIS.git NIMIS-Main-Integration
+git clone --depth 1 --single-branch --branch feat/collector-district-integration https://github.com/CipherBloom07/NIMIS.git NIMIS-Main-Integration
 cd ".\NIMIS-Main-Integration"
 npm install
 npm run dev -- --port 8081 --strictPort
