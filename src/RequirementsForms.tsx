@@ -2,7 +2,7 @@
  * Every form can be drafted offline; unapproved versions are NEVER uploaded.
  * Separate IDB prevents migration/mutation of existing baseline/photo storage.
  */
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {ClipboardList,MapPin,Camera,Save} from 'lucide-react';
 import catalogue from '../schemas/form-catalogue.v1.json';
 import manualSamples from '../schemas/fictional-manual-test-data.v1.json';
@@ -152,7 +152,10 @@ export default function RequirementsForms(){
   const [sessionActive,setSessionActive]=useState(institutionalSessionIsActive());
   const [bridgeState,setBridgeState]=useState<'checking'|'connected'|'offline'>('checking');
   const [lastSeen,setLastSeen]=useState('');
+  const bridgeBusy=useRef(false);
   async function refreshBridge(){
+    if(bridgeBusy.current)return;
+    bridgeBusy.current=true;
     if(!import.meta.env.DEV)return;
     try{
       const result=await fetch('http://127.0.0.1:8775/api/v1/stage/health',{
@@ -162,18 +165,28 @@ export default function RequirementsForms(){
       if(!result.ok||body.mode!=='isolated-development'||body.production_ready!==false)
         throw new Error('Incorrect NIMIS Core environment');
       setBridgeState('connected');setLastSeen(new Date().toLocaleTimeString());
-      const assigned=await loadAssignedCoreSchemes();
-      setSchemes(assigned);
-      setSchemeId(old=>assigned.some(x=>x.scheme_id===old)?old:assigned[0]?.scheme_id??'');
+      try{
+        const assigned=await loadAssignedCoreSchemes();
+        setSchemes(assigned);
+        setSchemeId(old=>assigned.some(x=>x.scheme_id===old)?old:assigned[0]?.scheme_id??'');
+      }catch(error){
+        setNotice('Connected to Core, but assignment lookup needs attention: '+String(error));
+      }
       if(navigator.onLine&&(import.meta.env.VITE_NIMIS_AUTH_MODE!=='oidc'||institutionalSessionIsActive())){
-        try{await syncQueuedForms()}catch(error){
-          if(!String(error).includes('already running'))throw error;
+        try{
+          const pending=(await listFormQueue()).some(item=>item.status==='pending');
+          if(pending)await syncQueuedForms();
+          await refreshFormReviewStatuses();
+        }catch(error){
+          if(!String(error).includes('already running'))
+            setNotice('Core connected; survey sync or receipt lookup needs attention: '+String(error));
         }
-        try{await refreshFormReviewStatuses()}catch{}
         setQueue(await listFormQueue());
       }
     }catch{
       setBridgeState('offline');
+    }finally{
+      bridgeBusy.current=false;
     }
   }
   useEffect(()=>{
