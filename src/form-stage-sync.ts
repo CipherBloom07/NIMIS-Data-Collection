@@ -1,3 +1,5 @@
+import catalogue from '../schemas/form-catalogue.v1.json';
+import {loadPhoto} from './storage';
 import {collectorAuthorizationHeaders} from './institutional-auth';
 /** Isolated LOCAL/FICTIONAL bridge for the main NIMIS Core stage form intake.
  * Only an explicit saved draft can be queued. No legacy baseline operations,
@@ -116,6 +118,44 @@ async function putQueue(row:StageQueueItem):Promise<void>{
     tx.onerror=()=>reject(tx.error);
   });}finally{db.close();}
 }
+/**
+ * Transfer each evidence blob before its immutable form JSON. Any failed or
+ * incomplete upload leaves the original operation queued unchanged.
+ */
+async function transferEvidence(payload:Payload):Promise<void>{
+  if(payload.scheme_id===null)return; // New-scheme request awaits registration.
+  const definition=catalogue.forms.find(x=>x.form_id===payload.form_id);
+  if(!definition)throw new Error('Form not in approved development catalogue');
+  const fields=definition.fields.filter(x=>x.type==='photo'||x.type==='attachments');
+  const referenced=new Set<string>();
+  for(const field of fields){
+    const value=payload.answers[field.field_id];
+    if(typeof value==='string'&&value)referenced.add(value);
+    if(Array.isArray(value))for(const id of value)if(typeof id==='string'&&id)referenced.add(id);
+  }
+  for(const id of referenced){
+    const blob=await loadPhoto(id);
+    if(!blob)throw new Error('Local photograph unavailable; retain submission and restore evidence: '+id);
+    if(blob.size>524288)throw new Error('Photo exceeds server evidence limit');
+    const bytes=await blob.arrayBuffer();
+    const hash=await crypto.subtle.digest('SHA-256',bytes);
+    const sha256=Array.from(new Uint8Array(hash)).map(x=>x.toString(16).padStart(2,'0')).join('');
+    const response=await fetch(BASE+'/evidence/'+encodeURIComponent(id)+
+      '?scheme_id='+encodeURIComponent(payload.scheme_id),{
+        method:'PUT',cache:'no-store',headers:{
+          ...collectorAuthorizationHeaders(),
+          'Content-Type':blob.type||'image/jpeg',
+          'X-Content-SHA256':sha256,
+        },body:blob,
+      });
+    if(!response.ok)throw new Error('Photo not acknowledged by NIMIS Core (HTTP '+response.status+')');
+    const ack=await response.json();
+    if(ack.photo_id!==id||ack.sha256!==sha256||
+       !['accepted','duplicate'].includes(ack.outcome)){
+      throw new Error('Invalid photo upload receipt; keep original evidence');
+    }
+  }
+}
 let inFlight=false;
 export async function syncQueuedForms():Promise<{synced:number;remaining:number;attention:number}>{
   assertDev();
@@ -127,6 +167,7 @@ export async function syncQueuedForms():Promise<{synced:number;remaining:number;
     for(const row of queue){
       let response:Response;
       try{
+        await transferEvidence(row.payload);
         response=await fetch(BASE+'/sync/push',{
           method:'POST',cache:'no-store',
           headers:{...collectorAuthorizationHeaders(),'Content-Type':'application/json'},
