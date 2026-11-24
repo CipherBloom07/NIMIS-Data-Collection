@@ -94,8 +94,7 @@ if (-not $Values.ContainsKey('NIMIS_PG_ADMIN_PASSWORD') -or
     $Values['NIMIS_PG_PASSWORD'] -notmatch '^[a-f0-9]{64}$') {
     throw 'LOCAL_SECRETS_INVALID: Do not overwrite credentials for an existing database.'
 }
-# The fictional API's sync database role requires its own unique credential.
-# Preserve existing secrets; create only the missing sync credential.
+# A distinct fictional sync role needs a random credential, but never rotate existing secrets.
 if (-not $Values.ContainsKey('NIMIS_PG_SYNC_PASSWORD')) {
     $SyncPassword = New-RandomSecret
     Add-Content -LiteralPath $Secrets -Encoding ASCII -Value "NIMIS_PG_SYNC_PASSWORD=$SyncPassword"
