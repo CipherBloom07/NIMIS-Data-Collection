@@ -13,7 +13,7 @@ test('demo offline operations are isolated from real survey IndexedDB',()=>{
   assert.doesNotMatch(stage,/\.delete\(/);
   assert.match(stage,/state:'pending'/);
   assert.match(stage,/outcome==='accepted'\|\|ack\.outcome==='duplicate'/);
-  assert.match(stage,/ack\.event_id===row\.id/);
+  assert.match(stage,/result\.event_id===row\.id/);
 });
 test('no official sync claim or auto-unlocked upload of baseline drafts',()=>{
   assert.match(stage,/FICTIONAL OPERATIONS ONLY/);
