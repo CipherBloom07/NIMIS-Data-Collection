@@ -45,7 +45,7 @@ async function putRecord(record:LocalRecord):Promise<void>{
   return transact('readwrite',(store,resolve,reject)=>{
     const request=store.put(record);
     request.onerror=()=>reject(request.error);
-    request.transaction.oncomplete=()=>resolve();
+    store.transaction.oncomplete=()=>resolve();
   });
 }
 function labelOf(field:string){return field.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}
