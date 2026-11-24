@@ -167,7 +167,7 @@ export async function pullStageStatuses():Promise<{updated:number;errors:number}
   for(const row of rows){
     try{
       const response=await fetch(BASE+'/sync/status/'+encodeURIComponent(row.payload.submission_id),{
-        cache:'no-store',headers:{'X-Nimis-Dev-Actor':STAGE_ACTOR},
+        cache:'no-store',headers:collectorAuthorizationHeaders(),
       });
       if(!response.ok){errors++;continue;}
       const payload:unknown=await response.json();
