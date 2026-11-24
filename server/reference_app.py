@@ -15,6 +15,7 @@ from typing import Annotated
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from server import postgres_reference
 
@@ -30,6 +31,16 @@ app = FastAPI(
     title="NIMIS Collect — Reference Access/Reference API",
     version="0.2.0",
     description="Development reference only, never an authorized Ministry production endpoint.",
+)
+
+# Allow only local main NIMIS development UI to access the fictional API.
+# No production deployment or arbitrary remote origins are supported.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:8081", "http://localhost:8081"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 class Actor(BaseModel):
