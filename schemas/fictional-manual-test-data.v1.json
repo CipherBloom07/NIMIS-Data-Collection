@@ -1,0 +1,94 @@
+{
+  "note": "FICTIONAL ONLY — manual typing examples for isolated nimis_core_dev. Never use real Ministry/farmer data.",
+  "scheme": {
+    "scheme_id": "00000000-0000-4000-8000-000000001000",
+    "scheme_name": "Fictional Canal Scheme — Training Only",
+    "scheme_code": "DEMO-NIMIS-0001",
+    "province_code": "DEMO-P",
+    "district_code": "DEMO-D"
+  },
+  "period_code": "2026-11",
+  "observed_at": "2026-11-24T09:00:00Z",
+  "source": "Synthetic NIMIS field training observation",
+  "forms": [
+    {
+      "form_id": "water_availability",
+      "name": "Water Availability and Abstraction",
+      "answers": {
+        "water_source_id": "DEMO-CANAL-01",
+        "reading_type": "gauge",
+        "water_level": "3.20",
+        "storage_percent": "65",
+        "flow": "0.42",
+        "abstraction_volume": "1240",
+        "rainfall": "18.5",
+        "observed_at": "2026-11-24T09:00",
+        "source": "Fictional gauge reading"
+      }
+    },
+    {
+      "form_id": "operational_status",
+      "name": "Scheme Operational Status",
+      "answers": {
+        "status": "Operational",
+        "equipped_area_ha": "120",
+        "developed_area_ha": "110",
+        "functional_area_ha": "95",
+        "actually_irrigated_area_ha": "82",
+        "active_beneficiaries": "64",
+        "main_issues": [
+          "Minor pump servicing",
+          "Canal gate inspection"
+        ],
+        "observed_at": "2026-11-24T09:00",
+        "source": "Fictional district field inspection"
+      }
+    },
+    {
+      "form_id": "seasonal_production",
+      "name": "Seasonal Cropping and Production",
+      "answers": {
+        "season_id": "DEMO-2026-SUMMER",
+        "crop_id": "Maize",
+        "planted_area_ha": "70",
+        "harvested_area_ha": "65",
+        "yield": "5.2",
+        "production": "338",
+        "market_destination": "Fictional district depot",
+        "observed_at": "2026-11-24T09:00",
+        "source": "Fictional crop production record"
+      }
+    },
+    {
+      "form_id": "energy_power",
+      "name": "Energy and Power Status",
+      "answers": {
+        "energy_source": "Grid and solar backup",
+        "grid_connected": "Yes",
+        "meter_reference": "DEMO-METER-01",
+        "solar_status": "Operational",
+        "outage_hours": "2.5",
+        "bill_status": "Training sample — no actual bill",
+        "observed_at": "2026-11-24T09:00",
+        "source": "Fictional power log"
+      }
+    }
+  ],
+  "negative_tests": [
+    {
+      "form_id": "operational_status",
+      "edit": "Set functional_area_ha to 150 while equipped_area_ha stays 120",
+      "expect": "Data-quality issue; do not queue"
+    },
+    {
+      "form_id": "water_availability",
+      "edit": "Set storage_percent to 120",
+      "expect": "Data-quality issue; do not queue"
+    },
+    {
+      "form_id": "seasonal_production",
+      "edit": "Set harvested_area_ha to 75 while planted_area_ha stays 70",
+      "expect": "Data-quality issue; do not queue"
+    }
+  ]
+}
