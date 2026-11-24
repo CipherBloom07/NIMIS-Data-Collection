@@ -150,6 +150,41 @@ export default function RequirementsForms(){
   const [notice,setNotice]=useState('Draft-only catalogue. Do not enter sensitive or official data into an unapproved development system.');
   const [busy,setBusy]=useState(false);
   const [sessionActive,setSessionActive]=useState(institutionalSessionIsActive());
+  const [bridgeState,setBridgeState]=useState<'checking'|'connected'|'offline'>('checking');
+  const [lastSeen,setLastSeen]=useState('');
+  async function refreshBridge(){
+    if(!import.meta.env.DEV)return;
+    try{
+      const result=await fetch('http://127.0.0.1:8775/api/v1/stage/health',{
+        cache:'no-store',signal:AbortSignal.timeout(4000),
+      });
+      const body=await result.json();
+      if(!result.ok||body.mode!=='isolated-development'||body.production_ready!==false)
+        throw new Error('Incorrect NIMIS Core environment');
+      setBridgeState('connected');setLastSeen(new Date().toLocaleTimeString());
+      const assigned=await loadAssignedCoreSchemes();
+      setSchemes(assigned);
+      setSchemeId(old=>assigned.some(x=>x.scheme_id===old)?old:assigned[0]?.scheme_id??'');
+      if(navigator.onLine&&(import.meta.env.VITE_NIMIS_AUTH_MODE!=='oidc'||institutionalSessionIsActive())){
+        try{await syncQueuedForms()}catch(error){
+          if(!String(error).includes('already running'))throw error;
+        }
+        try{await refreshFormReviewStatuses()}catch{}
+        setQueue(await listFormQueue());
+      }
+    }catch{
+      setBridgeState('offline');
+    }
+  }
+  useEffect(()=>{
+    if(!import.meta.env.DEV)return;
+    void refreshBridge();
+    // navigator.onLine can remain true while Core is offline. This bounded
+    // heartbeat finds the server once it starts and replays only queued events.
+    const handle=window.setInterval(()=>{if(document.visibilityState==='visible')void refreshBridge()},15000);
+    return()=>window.clearInterval(handle);
+  },[sessionActive]);
+
   const form=forms.find(x=>x.form_id===formId)!;
   const issues=validateRequirementsDraft(formId,answers,observed,source);
   useEffect(()=>{
@@ -257,7 +292,14 @@ export default function RequirementsForms(){
   if(!import.meta.env.DEV)return <p>Unapproved collection forms are disabled outside development.</p>;
   return <section className="panel" style={{padding:18}}>
     <div className="panel-title"><div><h2>Data collection — requirements forms</h2>
-      <p>All {forms.length} proposed operational datasets · Offline drafts only · Not published or synchronized</p></div></div>
+      <p>All {forms.length} proposed datasets · Offline saving · District-controlled synchronization and review</p></div></div>
+    <div role="status" className="form-validation" style={{marginBottom:12}}>
+      <strong>Connection to Main NIMIS: {bridgeState==='connected'?'Connected':bridgeState==='checking'?'Checking':'Offline / server unavailable'}</strong>
+      {' '}· Last checked successfully: {lastSeen||'not yet'} · {schemes.length} assigned schemes
+      <button className="secondary" type="button" disabled={busy}
+        style={{marginLeft:12}} onClick={()=>void refreshBridge()}>Reconnect and sync queued forms</button>
+      <p>Saved drafts remain local until queued. When the local Core reconnects, only previously queued forms are sent; District Officer must still verify them.</p>
+    </div>
     <p role="status" className="notice">{notice}</p>
     <details className="panel" style={{padding:12,marginBottom:14}}>
       <summary style={{cursor:'pointer',fontWeight:750}}>Fictional test values — manually enter, do not copy real records</summary>
