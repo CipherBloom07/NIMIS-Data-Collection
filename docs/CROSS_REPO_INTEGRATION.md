@@ -16,7 +16,7 @@ The main NIMIS repository is **currently a frontend prototype** with a localStor
 4. Main NIMIS dev UI on port **8081** opens **District Collector Inbox (Test)**; the browser obtains a separate loopback-only **district.demo** token and fetches district-scoped rows.
 5. District reviewer may **Verify test**, or enter a reason and **Return test**. Repeated decisions fail with HTTP 409.
 6. The **Provincial Review (Test)** page uses **provincial.demo** to review a district-verified fictional submission.
-7. The **Admin Publication (Test)** page uses **admin.demo** to publish a provincially reviewed record to a **fictional-only status**. No real national dashboard data or official Ministry database is modified.
+7. The **Admin Publication (Test)** page uses **admin.demo** to technically approve a provincially reviewed record and then publish it to a **fictional-only status**. No real national dashboard data or official Ministry database is modified.
 8. District, provincial and admin decisions are appended to a separate fictional decision-history table. No merge/deploy occurs.
 
 The collector's real IndexedDB drafts, outbox, photos and GPS stay on the device and are **never read or uploaded** by the integration test. The main app's local prototype registry is not touched. Development credentials and data live in ignored `database/` and environment variables.
@@ -67,10 +67,10 @@ The API accepts CORS only from the loopback main NIMIS dev origin. Both apps mus
 - The backend refuses a non-loopback database target or a database not named `nimis_collect_dev`.
 - The demo accepts **only** `DEMO-SCHEME-001` and a 200-character fictional note; it never imports arbitrary survey JSON or uploads photos.
 - Collector assigned schemes are determined server-side. Reused event UUIDs with different data are rejected.
-- District and provincial inboxes are restricted to their fictional geographical scopes; the admin inbox sees only provincially reviewed fictional records. Each inbox returns at most 100 rows.
-- Valid transitions are SUBMITTED → VERIFIED → REVIEWED → PUBLISHED (fictional only), with RETURNED available at district/provincial review. Every accepted decision has a separate immutable demo history row.
+- District and provincial inboxes are restricted to their fictional geographical scopes; the admin inbox sees provincially reviewed and technically approved fictional records. Each inbox returns at most 100 rows.
+- Valid transitions are SUBMITTED → VERIFIED → REVIEWED → TECH_APPROVED → PUBLISHED (fictional only), with RETURNED available at district/provincial review. Every accepted decision has a separate immutable demo history row.
 - No production user roles, device enrolment, encrypted mobile DB, legal approval, full sync protocol, server acknowledgement of real outbox entries, conflict resolution, photo transfer or offline auto-retry is implemented.
-- A passing CI test validates fictional end-to-end flow in isolated PostgreSQL only. It does not demonstrate cross-device field readiness or throughput.
+- The national technical gate is demonstrated with one fictional Admin actor; true separate technical unit identity and four-role permissions need an approved production policy. A passing CI test validates fictional end-to-end flow in isolated PostgreSQL only. It does not demonstrate cross-device field readiness or throughput.
 
 ## Path to real synchronization
 
