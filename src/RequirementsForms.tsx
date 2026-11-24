@@ -63,6 +63,33 @@ function valueText(value:unknown):string{
 function isMeasurement(type:string){return type.startsWith('measurement:')}
 const today=()=>new Date().toISOString();
 const typesSet=new Set(['text','reference','choice','choice:yes_no','choice:good_moderate_bad','choice:gauge_visual_estimate']);
+function StructuredField({field,value,onChange}:{field:FormField;value:unknown;onChange:(v:unknown)=>void}){
+  const template=field.type==='group'?'{}':'[]';
+  const [draft,setDraft]=useState(valueText(value)||template);
+  const [error,setError]=useState('');
+  useEffect(()=>{setDraft(valueText(value)||template);setError('')},[value,template]);
+  function apply(){
+    try{
+      const parsed:unknown=JSON.parse(draft);
+      const valid=field.type==='group'
+        ? Boolean(parsed)&&typeof parsed==='object'&&!Array.isArray(parsed)
+        : Array.isArray(parsed)&&(
+            field.type==='repeating_group'
+              ? parsed.every(x=>x&&typeof x==='object'&&!Array.isArray(x))
+              : parsed.every(x=>typeof x==='string'));
+      if(!valid)throw new Error(field.type==='group'?'Expected one object':'Expected a list');
+      onChange(parsed);setError('');
+    }catch(error){setError('Invalid structured entries: '+String(error))}
+  }
+  return <div className="field">
+    <span>{labelOf(field.field_id)} — {field.type.replaceAll('_',' ')}</span>
+    <small>{field.type==='group'?'Enter a JSON object with named properties.':'Enter a JSON array of structured entries.'} These field templates are not yet Department-approved.</small>
+    <textarea rows={4} value={draft} onChange={e=>setDraft(e.target.value)}
+      spellCheck={false} aria-label={labelOf(field.field_id)+' structured data'}/>
+    <button type="button" className="secondary" onClick={apply}>Validate and apply entries</button>
+    {error&&<small role="alert">{error}</small>}
+  </div>;
+}
 function Field({field,value,onChange}:{field:FormField;value:unknown;onChange:(v:unknown)=>void}){
   const type=field.type;
   const title=labelOf(field.field_id);
@@ -87,10 +114,22 @@ function Field({field,value,onChange}:{field:FormField;value:unknown;onChange:(v
   if(isMeasurement(type)||type==='integer')return <label className="field"><span>{title} {field.units?'('+field.units+')':''}</span>
     <input type="number" min="0" step="any" value={valueText(value)} onChange={e=>onChange(e.target.value)}/></label>;
   if(type==='datetime')return <label className="field"><span>{title}</span><input type="datetime-local" value={valueText(value)} onChange={e=>onChange(e.target.value)}/></label>;
-  if(type==='group'||type==='repeating_group'||type==='reference_list'||type==='multi')
-    return <label className="field"><span>{title} (structured entries)</span>
-      <textarea rows={3} value={valueText(value)} placeholder="Enter approved references or details; confirm with district officer"
-        onChange={e=>onChange(e.target.value)}/></label>;
+  if(type==='group'||type==='repeating_group')
+    return <StructuredField field={field} value={value} onChange={onChange}/>;
+  if(type==='reference_list'||type==='multi')
+    return <label className="field"><span>{title} — one entry per line</span>
+      <textarea rows={3} value={Array.isArray(value)?value.join('\\n'):valueText(value)}
+        onChange={e=>onChange(e.target.value.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean))}/></label>;
+  if(type==='choice:gauge_visual_estimate'||type==='choice:SI87_B1_B2_B3_B4_SIRP_other'){
+    const options=type==='choice:gauge_visual_estimate'
+      ? ['gauge','visual','estimate']:['SI87','B1','B2','B3','B4','SIRP','other'];
+    return <label className="field"><span>{title}</span>
+      <select value={valueText(value)} onChange={e=>onChange(e.target.value)}>
+        <option value="">Select</option>{options.map(option=><option key={option} value={option}>{option}</option>)}
+      </select></label>;
+  }
+  if(type==='date')return <label className="field"><span>{title}</span>
+    <input type="date" value={valueText(value)} onChange={e=>onChange(e.target.value)}/></label>;
   return <label className="field"><span>{title}</span>
     <input type="text" value={valueText(value)} onChange={e=>onChange(e.target.value)}
       placeholder={typesSet.has(type)?'Enter or select approved value':'Enter reference'}/></label>;
