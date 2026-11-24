@@ -121,3 +121,26 @@ export async function syncStageOperations():Promise<{accepted:number;pending:num
     return {accepted,pending:(await all()).filter(row=>row.state==='pending').length,errors};
   }finally{inFlight=false;}
 }
+
+/** Explicitly refresh latest officer review status; never changes the local event payload. */
+export async function pullStageStatuses():Promise<{updated:number;errors:number}>{
+  const rows=(await all()).filter(row=>row.state==='synced').slice(-25);
+  let updated=0,errors=0;
+  for(const row of rows){
+    try{
+      const response=await fetch(BASE+'/sync/status/'+encodeURIComponent(row.payload.submission_id),{
+        cache:'no-store',headers:{'X-Nimis-Dev-Actor':STAGE_ACTOR},
+      });
+      if(!response.ok){errors++;continue;}
+      const payload:unknown=await response.json();
+      if(!payload||typeof payload!=='object'||!('submission_id' in payload)||
+         payload.submission_id!==row.payload.submission_id||!('status' in payload)||
+         typeof payload.status!=='string'){
+         errors++;continue;
+      }
+      await save({...row,server_status:payload.status});
+      updated++;
+    }catch{errors++}
+  }
+  return {updated,errors};
+}
