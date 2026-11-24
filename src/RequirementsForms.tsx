@@ -284,6 +284,12 @@ export default function RequirementsForms(){
       {' '}{queue.filter(x=>x.status==='synced').length} acknowledged,
       {' '}{queue.filter(x=>x.status==='attention').length} need attention.
       Photos for assigned schemes are uploaded to the isolated local Core before form receipt; originals remain on the device.</p>
+    {queue.some(x=>x.status==='pending'&&Boolean(x.reason))&&
+     <div role="status" className="form-validation"><strong>Offline synchronization is waiting</strong>
+      {queue.filter(x=>x.status==='pending'&&Boolean(x.reason)).slice(0,8).map(row=>
+       <p key={row.id}>{row.payload.form_id} · {row.payload.period_code}:
+        {' '}{row.reason} · Original event retained for safe retry</p>)}
+     </div>}
     {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING').length>0&&
      <div role="status" className="form-validation"><strong>Collector follow-up required</strong>
       {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING')
