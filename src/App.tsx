@@ -11,6 +11,7 @@ import DataTestPanel from './DataTestPanel';
 import WorkflowHome from './WorkflowHome';
 import HelpPanel from './HelpPanel';
 import StoragePanel from './StoragePanel';
+import BrandLogo from './BrandLogo';
 import { quickStorageRisk, type StorageRisk } from './storage-health';
 import './storage-panel.css';
 import './workflow.css';
@@ -277,7 +278,7 @@ export default function App() {
   return <div className="shell">
     {menuOpen && <button type="button" className="mobile-scrim" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
     <aside className={'sidebar ' + (menuOpen ? 'sidebar-open' : '')}>
-      <div className="logo-row"><img src="/zimbabwe-coat-of-arms.jpg" alt="Zimbabwe national coat of arms"/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
+      <div className="logo-row"><BrandLogo/><div><strong>NIMIS</strong><small>FIELD COLLECTION</small></div></div>
       <div className="aside-label">FIELD OPERATIONS</div>
       <button className={'nav-button ' + (!editing && !referenceView && !dataTestView && !helpView && !storageView ? 'selected' : '')} onClick={() => void leaveForm('dashboard')}>
         <ClipboardList size={19}/> Survey dashboard
@@ -293,7 +294,7 @@ export default function App() {
     <main className="main">
       <header className="topbar">
         <button type="button" className="menu-button" aria-label="Open menu" onClick={() => setMenuOpen(!menuOpen)}><Menu/></button>
-        <div className="mobile-brand"><img src="/zimbabwe-coat-of-arms.jpg" alt="Zimbabwe coat of arms"/><strong>NIMIS Collect</strong></div>
+        <div className="mobile-brand"><BrandLogo compact/><strong>NIMIS Collect</strong></div>
         <span className="eyebrow">MINISTRY OF AGRICULTURE · DEPARTMENT OF IRRIGATION</span>
         <span className={'network ' + (online ? 'connected' : '')}>{online ? <Wifi size={16}/> : <WifiOff size={16}/>} {online ? 'Network available' : 'Offline'}</span>
       </header>
