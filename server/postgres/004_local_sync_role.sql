@@ -10,3 +10,5 @@ GRANT SELECT ON nimis_collect_demo.officer, nimis_collect_demo.scheme, nimis_col
 GRANT SELECT, INSERT ON nimis_collect_demo.field_submission TO nimis_sync_demo;
 GRANT UPDATE (status, reviewed_at, reviewed_by, review_note) ON nimis_collect_demo.field_submission TO nimis_sync_demo;
 REVOKE CREATE ON SCHEMA nimis_collect_demo FROM nimis_sync_demo;
+
+GRANT SELECT, INSERT ON nimis_collect_demo.demo_decision TO nimis_sync_demo;
