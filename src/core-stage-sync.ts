@@ -24,6 +24,44 @@ const STAGE_ACTOR='00000000-0000-4000-8000-000000000004';
 const BASE='http://127.0.0.1:8775/api/v1/stage';
 export const DEMO_SCHEME='00000000-0000-4000-8000-000000001000';
 
+/** Schemes come from NIMIS Core's server-scoped assignments. No shadow master. */
+export type CoreAssignedScheme = {
+  scheme_id:string; scheme_code:string; scheme_name:string;
+  province_code:string; district_code:string; revision:number;
+};
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export async function loadAssignedCoreSchemes():Promise<CoreAssignedScheme[]> {
+  // Never permit synthetic development actor authentication in a production build.
+  if (!import.meta.env.DEV) throw new Error('Fictional scheme lookup is disabled in production.');
+  const result=await fetch(BASE+'/schemes',{
+    cache:'no-store',headers:{'X-Nimis-Dev-Actor':STAGE_ACTOR},
+  });
+  if(!result.ok)throw new Error('Main NIMIS Core assigned schemes unavailable (HTTP '+result.status+').');
+  const data:unknown=await result.json();
+  if(!data||typeof data!=='object'||!('source' in data)||
+    data.source!=='ISOLATED_DEVELOPMENT'||!('items' in data)||!Array.isArray(data.items)){
+    throw new Error('Unrecognized NIMIS Core scheme list.');
+  }
+  const seen=new Set<string>();
+  const schemes:CoreAssignedScheme[]=[];
+  for(const item of data.items) {
+    if(!item||typeof item!=='object'||!UUID.test(String(item.scheme_id))||
+      typeof item.scheme_code!=='string'||typeof item.scheme_name!=='string'||
+      typeof item.province_code!=='string'||typeof item.district_code!=='string'||
+      !Number.isSafeInteger(item.revision)||item.revision<1||
+      seen.has(item.scheme_id)){
+      throw new Error('Invalid or duplicate authoritative scheme in NIMIS Core response.');
+    }
+    seen.add(item.scheme_id);
+    schemes.push({
+      scheme_id:item.scheme_id,scheme_code:item.scheme_code,scheme_name:item.scheme_name,
+      province_code:item.province_code,district_code:item.district_code,revision:item.revision,
+    });
+  }
+  return schemes;
+}
+
+
 function openDb():Promise<IDBDatabase>{
   return new Promise((resolve,reject)=>{
     const request=indexedDB.open(DATABASE,1);

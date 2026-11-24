@@ -1,11 +1,13 @@
 import {useCallback,useEffect,useState} from 'react';
 import {AlertTriangle,CloudUpload,Database,RefreshCw,Save,ShieldCheck,WifiOff} from 'lucide-react';
-import {addStageOperation,DEMO_SCHEME,listStageOperations,pullStageStatuses,syncStageOperations,type StageOperation} from './core-stage-sync';
+import {addStageOperation,loadAssignedCoreSchemes,listStageOperations,pullStageStatuses,syncStageOperations,type StageOperation,type CoreAssignedScheme} from './core-stage-sync';
 
 const periodNow=()=>new Date().toISOString().slice(0,7);
 export default function CoreStageSyncLab(){
   const [rows,setRows]=useState<StageOperation[]>([]);
-  const [schemeId,setSchemeId]=useState(DEMO_SCHEME);
+  const [schemeId,setSchemeId]=useState('');
+  const [assignedSchemes,setAssignedSchemes]=useState<CoreAssignedScheme[]>([]);
+  const [assignmentsLoading,setAssignmentsLoading]=useState(true);
   const [period,setPeriod]=useState(periodNow);
   const [revision,setRevision]=useState(1);
   const [equipped,setEquipped]=useState('20');
@@ -16,6 +18,21 @@ export default function CoreStageSyncLab(){
 
   const refresh=useCallback(async()=>setRows(await listStageOperations()),[]);
   useEffect(()=>{void refresh().catch(error=>setMessage(String(error)))},[refresh]);
+  useEffect(()=>{
+    let alive=true;
+    void loadAssignedCoreSchemes().then(items=>{
+      if(!alive)return;
+      setAssignedSchemes(items);
+      setSchemeId(current=>items.some(item=>item.scheme_id===current)?current:items[0]?.scheme_id??'');
+      if(items[0])setRevision(items[0].revision);
+      setMessage(items.length
+        ? 'Loaded '+items.length+' assigned fictional scheme(s) directly from Main NIMIS Core. No national records were copied.'
+        : 'No fictional schemes assigned. Create and assign a test scheme in Main NIMIS Core first.');
+    }).catch(error=>{
+      if(alive)setMessage('Assigned schemes unavailable; no data submitted: '+String(error));
+    }).finally(()=>{if(alive)setAssignmentsLoading(false)});
+    return()=>{alive=false};
+  },[]);
   const sync=useCallback(async()=>{
     setBusy(true);
     try{
@@ -46,6 +63,9 @@ export default function CoreStageSyncLab(){
     if(busy)return;
     setBusy(true);
     try{
+      if(!assignedSchemes.some(item=>item.scheme_id===schemeId)){
+        throw new Error('Choose a scheme currently assigned by Main NIMIS Core.');
+      }
       const relevant=rows.filter(row=>row.payload.scheme_id===schemeId&&row.payload.period_code===period);
       if(relevant.some(row=>row.state!=='synced')){
         throw new Error('There is an unsynced fictional observation for this scheme and period. Sync or inspect it before making a correction.');
@@ -78,8 +98,18 @@ export default function CoreStageSyncLab(){
       <div className="metric"><span>Network state</span><strong>{online?'Online':'Offline'}</strong><small>Local-only backend required</small></div>
     </div>
     <div className="form-grid" style={{padding:14}}>
-      <label className="field"><span>Fictional scheme UUID (assigned to synthetic collector)</span>
-        <input value={schemeId} onChange={event=>setSchemeId(event.target.value.trim())}/></label>
+      <label className="field"><span>Scheme assigned by Main NIMIS Core (fictional pilot)</span>
+        <select value={schemeId} disabled={assignmentsLoading||assignedSchemes.length===0}
+          onChange={event=>{
+            const choice=assignedSchemes.find(item=>item.scheme_id===event.target.value);
+            setSchemeId(choice?.scheme_id??'');
+            if(choice)setRevision(choice.revision);
+          }}>
+          {assignedSchemes.length===0&&<option value="">No assigned schemes loaded</option>}
+          {assignedSchemes.map(item=><option key={item.scheme_id} value={item.scheme_id}>
+            {item.scheme_name} · {item.scheme_code} · {item.district_code}
+          </option>)}
+        </select></label>
       <label className="field"><span>Reporting period (YYYY-MM)</span>
         <input type="month" value={period} onChange={event=>setPeriod(event.target.value)}/></label>
       <label className="field"><span>Known master revision</span>
@@ -90,7 +120,7 @@ export default function CoreStageSyncLab(){
         <input type="number" inputMode="decimal" min="0" step="0.01" value={functional} onChange={event=>setFunctional(event.target.value)}/></label>
     </div>
     <div style={{display:'flex',gap:10,flexWrap:'wrap',padding:'10px 14px'}}>
-      <button type="button" className="primary" disabled={busy} onClick={()=>void capture()}><Save size={16}/> Save fictional event offline</button>
+      <button type="button" className="primary" disabled={busy||!schemeId||assignmentsLoading} onClick={()=>void capture()}><Save size={16}/> Save fictional event offline</button>
       <button type="button" className="secondary" disabled={busy||pending===0||!online} onClick={()=>void sync()}>
         {online?<CloudUpload size={16}/>:<WifiOff size={16}/>} Sync test queue</button>
       <button type="button" className="secondary" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={16}/> Refresh status</button>
