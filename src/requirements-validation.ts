@@ -8,7 +8,8 @@ export function validateRequirementsDraft(
 ):CollectionIssue[]{
   const issues:CollectionIssue[]=[];
   if(!source.trim())issues.push({field:'source',message:'Record a source or field observation reference'});
-  const date=new Date(observedAt);
+  if(source.length>160)issues.push({field:'source',message:'Source is too long'});
+    const date=new Date(observedAt);
   if(!observedAt || !Number.isFinite(date.getTime()) ||
      date.getTime()>Date.now()+24*60*60*1000){
     issues.push({field:'observed_at',message:'Supply a valid observation date, not in the future'});
@@ -19,6 +20,26 @@ export function validateRequirementsDraft(
     const value=answers[field.field_id];
     if(value===undefined||value===null||value==='')continue;
     const type=field.type;
+    const choices:Record<string,string[]>={
+      'choice:yes_no':['Yes','No'],
+      'choice:good_moderate_bad':['Good','Moderate','Bad'],
+      'choice:gauge_visual_estimate':['gauge','visual','estimate'],
+      'choice:SI87_B1_B2_B3_B4_SIRP_other':['SI87','B1','B2','B3','B4','SIRP','other'],
+    };
+    if(choices[type] && (typeof value!=='string'||!choices[type].includes(value))){
+      issues.push({field:field.field_id,message:'Value is not one of the recognized draft choices'});
+    }
+    const photoFields=(type==='photo'||type==='attachments')?
+      (Array.isArray(value)?value:[value]):[];
+    if(photoFields.some(id=>typeof id!=='string'||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))){
+      issues.push({field:field.field_id,message:'Photo must reference a saved UUID'});
+    }
+    if(type==='date'&&(
+      typeof value!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)||
+      Number.isNaN(Date.parse(value)))){
+      issues.push({field:field.field_id,message:'Enter a valid YYYY-MM-DD date'});
+    }
     if(type==='repeating_group'&&(!Array.isArray(value)||
         value.some(x=>!x||typeof x!=='object'||Array.isArray(x)))){
       issues.push({field:field.field_id,message:'A repeating form section must contain structured records'});
