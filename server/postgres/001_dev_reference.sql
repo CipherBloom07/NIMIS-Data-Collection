@@ -8,7 +8,7 @@ REVOKE ALL ON SCHEMA nimis_collect_demo FROM PUBLIC;
 
 CREATE TABLE IF NOT EXISTS nimis_collect_demo.officer (
   officer_id uuid PRIMARY KEY,
-  role_code text NOT NULL CHECK (role_code IN ('field_officer','scheme_manager','dido','pido')),
+  role_code text NOT NULL CHECK (role_code IN ('field_officer','scheme_manager','dido','pido','district_officer')),
   active boolean NOT NULL DEFAULT true
 );
 CREATE TABLE IF NOT EXISTS nimis_collect_demo.scheme (
