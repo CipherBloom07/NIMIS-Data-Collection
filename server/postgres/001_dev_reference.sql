@@ -42,8 +42,3 @@ ON CONFLICT (officer_id, scheme_id, role_code) DO NOTHING;
 
 REVOKE ALL ON ALL TABLES IN SCHEMA nimis_collect_demo FROM PUBLIC;
 COMMIT;
-
--- Fictional District Officer persona for isolated local integration tests.
-INSERT INTO nimis_collect_demo.officer(officer_id, role_code)
-VALUES ('10000000-0000-4000-8000-000000000002','district_officer')
-ON CONFLICT (officer_id) DO NOTHING;
