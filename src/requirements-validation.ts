@@ -1,3 +1,4 @@
+import catalogue from '../schemas/form-catalogue.v1.json';
 /** Independent client-side preflight; server validation remains authoritative.
  * Drafts with issues can still be saved, but can never be treated as publishable.
  */
@@ -11,6 +12,34 @@ export function validateRequirementsDraft(
   if(!observedAt || !Number.isFinite(date.getTime()) ||
      date.getTime()>Date.now()+24*60*60*1000){
     issues.push({field:'observed_at',message:'Supply a valid observation date, not in the future'});
+  }
+  const form=catalogue.forms.find(x=>x.form_id===formId);
+  if(!form)issues.push({field:'form_id',message:'Unknown collection form version'});
+  for(const field of form?.fields??[]){
+    const value=answers[field.field_id];
+    if(value===undefined||value===null||value==='')continue;
+    const type=field.type;
+    if(type==='repeating_group'&&(!Array.isArray(value)||
+        value.some(x=>!x||typeof x!=='object'||Array.isArray(x)))){
+      issues.push({field:field.field_id,message:'A repeating form section must contain structured records'});
+    }
+    if(type==='group'&&(!value||typeof value!=='object'||Array.isArray(value))){
+      issues.push({field:field.field_id,message:'Expected a structured object'});
+    }
+    if((type==='multi'||type==='reference_list')&&(!Array.isArray(value)||
+        value.some(x=>typeof x!=='string'||!x.trim()))){
+      issues.push({field:field.field_id,message:'Enter a list of named entries, not raw text'});
+    }
+    if((type.startsWith('measurement:')||type==='integer')&&
+       (typeof value!=='string'&&typeof value!=='number'||
+        !Number.isFinite(Number(value))||Number(value)<0||
+        (type==='integer'&&!Number.isInteger(Number(value))))){
+      issues.push({field:field.field_id,message:'Enter a finite non-negative'+(type==='integer'?' whole number':' measurement')});
+    }
+    if((type==='photo'||type==='attachments')&&
+       (typeof value!=='string'&&!Array.isArray(value))){
+      issues.push({field:field.field_id,message:'Photographs must have saved local IDs'});
+    }
   }
   for(const [key,value] of Object.entries(answers)){
     if(key.endsWith('_gps')||key==='scheme_gps'){

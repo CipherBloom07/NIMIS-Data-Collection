@@ -7,7 +7,7 @@ const view=readFileSync('src/CoreStageSyncLab.tsx','utf8');
 test('collector fetches scheme masters from main NIMIS Core instead of inventing IDs',()=>{
   assert.match(source,/loadAssignedCoreSchemes/);
   assert.match(source,/BASE\+'\/schemes'/);
-  assert.match(source,/X-Nimis-Dev-Actor/);
+  assert.match(source,/collectorAuthorizationHeaders\(\)/);
   assert.match(source,/ISOLATED_DEVELOPMENT/);
   assert.match(source,/seen\.has\(item\.scheme_id\)/);
   assert.match(source,/item\.revision/);

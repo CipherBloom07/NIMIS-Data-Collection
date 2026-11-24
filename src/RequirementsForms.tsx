@@ -8,7 +8,8 @@ import catalogue from '../schemas/form-catalogue.v1.json';
 import {loadAssignedCoreSchemes,type CoreAssignedScheme} from './core-stage-sync';
 import {savePhoto} from './storage';
 import {validateRequirementsDraft} from './requirements-validation';
-import {queueSavedForm,listFormQueue,syncQueuedForms,type StageQueueItem} from './form-stage-sync';
+import {queueSavedForm,listFormQueue,syncQueuedForms,refreshFormReviewStatuses,type StageQueueItem} from './form-stage-sync';
+import {institutionalSessionIsActive,startInstitutionalSignIn,signOutInstitutionalSession} from './oidc-session';
 
 type FormField={field_id:string;type:string;units:string|null;metadata:string[]};
 type FormDefinition={form_id:string;form_version:number;name:string;frequency:string;fields:FormField[]};
@@ -62,6 +63,33 @@ function valueText(value:unknown):string{
 function isMeasurement(type:string){return type.startsWith('measurement:')}
 const today=()=>new Date().toISOString();
 const typesSet=new Set(['text','reference','choice','choice:yes_no','choice:good_moderate_bad','choice:gauge_visual_estimate']);
+function StructuredField({field,value,onChange}:{field:FormField;value:unknown;onChange:(v:unknown)=>void}){
+  const template=field.type==='group'?'{}':'[]';
+  const [draft,setDraft]=useState(valueText(value)||template);
+  const [error,setError]=useState('');
+  useEffect(()=>{setDraft(valueText(value)||template);setError('')},[value,template]);
+  function apply(){
+    try{
+      const parsed:unknown=JSON.parse(draft);
+      const valid=field.type==='group'
+        ? Boolean(parsed)&&typeof parsed==='object'&&!Array.isArray(parsed)
+        : Array.isArray(parsed)&&(
+            field.type==='repeating_group'
+              ? parsed.every(x=>x&&typeof x==='object'&&!Array.isArray(x))
+              : parsed.every(x=>typeof x==='string'));
+      if(!valid)throw new Error(field.type==='group'?'Expected one object':'Expected a list');
+      onChange(parsed);setError('');
+    }catch(error){setError('Invalid structured entries: '+String(error))}
+  }
+  return <div className="field">
+    <span>{labelOf(field.field_id)} — {field.type.replaceAll('_',' ')}</span>
+    <small>{field.type==='group'?'Enter a JSON object with named properties.':'Enter a JSON array of structured entries.'} These field templates are not yet Department-approved.</small>
+    <textarea rows={4} value={draft} onChange={e=>setDraft(e.target.value)}
+      spellCheck={false} aria-label={labelOf(field.field_id)+' structured data'}/>
+    <button type="button" className="secondary" onClick={apply}>Validate and apply entries</button>
+    {error&&<small role="alert">{error}</small>}
+  </div>;
+}
 function Field({field,value,onChange}:{field:FormField;value:unknown;onChange:(v:unknown)=>void}){
   const type=field.type;
   const title=labelOf(field.field_id);
@@ -86,10 +114,22 @@ function Field({field,value,onChange}:{field:FormField;value:unknown;onChange:(v
   if(isMeasurement(type)||type==='integer')return <label className="field"><span>{title} {field.units?'('+field.units+')':''}</span>
     <input type="number" min="0" step="any" value={valueText(value)} onChange={e=>onChange(e.target.value)}/></label>;
   if(type==='datetime')return <label className="field"><span>{title}</span><input type="datetime-local" value={valueText(value)} onChange={e=>onChange(e.target.value)}/></label>;
-  if(type==='group'||type==='repeating_group'||type==='reference_list'||type==='multi')
-    return <label className="field"><span>{title} (structured entries)</span>
-      <textarea rows={3} value={valueText(value)} placeholder="Enter approved references or details; confirm with district officer"
-        onChange={e=>onChange(e.target.value)}/></label>;
+  if(type==='group'||type==='repeating_group')
+    return <StructuredField field={field} value={value} onChange={onChange}/>;
+  if(type==='reference_list'||type==='multi')
+    return <label className="field"><span>{title} — one entry per line</span>
+      <textarea rows={3} value={Array.isArray(value)?value.join('\n'):valueText(value)}
+        onChange={e=>onChange(e.target.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))}/></label>;
+  if(type==='choice:gauge_visual_estimate'||type==='choice:SI87_B1_B2_B3_B4_SIRP_other'){
+    const options=type==='choice:gauge_visual_estimate'
+      ? ['gauge','visual','estimate']:['SI87','B1','B2','B3','B4','SIRP','other'];
+    return <label className="field"><span>{title}</span>
+      <select value={valueText(value)} onChange={e=>onChange(e.target.value)}>
+        <option value="">Select</option>{options.map(option=><option key={option} value={option}>{option}</option>)}
+      </select></label>;
+  }
+  if(type==='date')return <label className="field"><span>{title}</span>
+    <input type="date" value={valueText(value)} onChange={e=>onChange(e.target.value)}/></label>;
   return <label className="field"><span>{title}</span>
     <input type="text" value={valueText(value)} onChange={e=>onChange(e.target.value)}
       placeholder={typesSet.has(type)?'Enter or select approved value':'Enter reference'}/></label>;
@@ -108,6 +148,7 @@ export default function RequirementsForms(){
   const [revision,setRevision]=useState(0);
   const [notice,setNotice]=useState('Draft-only catalogue. Do not enter sensitive or official data into an unapproved development system.');
   const [busy,setBusy]=useState(false);
+  const [sessionActive,setSessionActive]=useState(institutionalSessionIsActive());
   const form=forms.find(x=>x.form_id===formId)!;
   const issues=validateRequirementsDraft(formId,answers,observed,source);
   useEffect(()=>{
@@ -123,7 +164,7 @@ export default function RequirementsForms(){
   },[]);
   useEffect(()=>{void loadAssignedCoreSchemes().then(list=>{
     setSchemes(list);setSchemeId(list[0]?.scheme_id??'');
-  }).catch(error=>setNotice('Main NIMIS Core scheme assignments unavailable: '+String(error)))},[]);
+  }).catch(error=>setNotice('Main NIMIS Core scheme assignments unavailable: '+String(error)))},[sessionActive]);
   function fresh(next:string){setFormId(next);setAnswers({});setRecordId(null);setRevision(0)}
   function edit(record:LocalRecord){
     setFormId(record.form_id);setSchemeId(record.scheme_id);setPeriod(record.period_code);
@@ -170,8 +211,18 @@ export default function RequirementsForms(){
       const result=await syncQueuedForms();
       setQueue(await listFormQueue());
       setNotice('Development sync: '+result.synced+' acknowledged, '+result.remaining+
-        ' pending, '+result.attention+' require review. Photo files are NOT transferred.');
+        ' pending, '+result.attention+' require review. Referenced photos are uploaded and checksum-verified before form receipt for assigned schemes.');
     }catch(error){setNotice('Sync unavailable; operations preserved: '+String(error))}
+    finally{setBusy(false)}
+  }
+  async function refreshReviews(){
+    setBusy(true);
+    try{
+      const result=await refreshFormReviewStatuses();
+      setQueue(await listFormQueue());
+      setNotice('Officer review: '+result.checked+' receipts checked, '+result.updated+
+        ' status changes, '+result.attention+' returned or conflicted. Returned submissions need a corrected new draft revision.');
+    }catch(error){setNotice('Review lookup unavailable; saved receipts remain untouched: '+String(error))}
     finally{setBusy(false)}
   }
   if(!import.meta.env.DEV)return <p>Unapproved collection forms are disabled outside development.</p>;
@@ -179,6 +230,16 @@ export default function RequirementsForms(){
     <div className="panel-title"><div><h2>Data collection — requirements forms</h2>
       <p>All {forms.length} proposed operational datasets · Offline drafts only · Not published or synchronized</p></div></div>
     <p role="status" className="notice">{notice}</p>
+    {import.meta.env.VITE_NIMIS_AUTH_MODE==='oidc'&&<div className="form-validation">
+      <strong>Institutional account: {sessionActive?'Signed in (session only)':'Not signed in'}</strong>
+      <p>Uses an approved identity provider with PKCE. No shared officer account or stored access token.</p>
+      {!sessionActive?<button className="secondary" type="button" onClick={()=>{
+        void startInstitutionalSignIn().catch(error=>setNotice('Sign-in unavailable: '+String(error)));
+      }}>Sign in with institutional account</button>:
+        <button type="button" className="secondary" onClick={()=>{
+          signOutInstitutionalSession();setSessionActive(false);setSchemes([]);setSchemeId('');
+        }}>Sign out of this device</button>}
+    </div>}
     <div className="form-grid">
       <label className="field"><span>Required dataset</span><select value={formId} onChange={e=>fresh(e.target.value)}>
         {forms.map(f=><option key={f.form_id} value={f.form_id}>{f.name}</option>)}</select></label>
@@ -205,11 +266,25 @@ export default function RequirementsForms(){
       <button className="primary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={18}/> Save offline draft</button>
       <button className="secondary" disabled={busy||issues.length>0||!recordId} onClick={()=>void enqueue()}>Queue saved revision (fictional test)</button>
       <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Sync test queue to NIMIS Core</button>
+      <button className="secondary" disabled={busy||!queue.some(x=>x.status==='synced'||Boolean(x.server_status))}
+        onClick={()=>void refreshReviews()}>Refresh officer decisions</button>
       <span>Revision {revision} · No automatic upload or approval</span>
     </div>
     <p role="status"><strong>Development queue:</strong> {queue.filter(x=>x.status==='pending').length} pending,
       {' '}{queue.filter(x=>x.status==='synced').length} acknowledged,
-      {' '}{queue.filter(x=>x.status==='attention').length} need attention. Only metadata and form answers are staged; photographs stay on this device.</p>
+      {' '}{queue.filter(x=>x.status==='attention').length} need attention.
+      Photos for assigned schemes are uploaded to the isolated local Core before form receipt; originals remain on the device.</p>
+    {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING').length>0&&
+     <div role="status" className="form-validation"><strong>Collector follow-up required</strong>
+      {queue.filter(x=>x.status==='attention'||x.server_status==='EVIDENCE_PENDING')
+        .map(row=><p key={row.id}>{row.payload.form_id} · {row.payload.period_code} · {row.server_status??row.status}
+          {row.reason?': '+row.reason:''}</p>)}
+     </div>}
+    {queue.some(x=>Boolean(x.server_status))&&
+     <div><h3>Officer review status</h3>
+      {queue.filter(x=>Boolean(x.server_status)).slice(-10).map(row=>
+       <p key={row.id}><strong>{row.payload.form_id}</strong> · {row.payload.period_code} · {row.server_status}
+       </p>)}</div>}
     <h3><ClipboardList size={18}/> Saved local forms</h3>
     {records.length===0?<p>No drafts in the proposed form catalogue.</p>:
       <div className="record-list">{records.slice().reverse().map(row=><button key={row.id} className="record"

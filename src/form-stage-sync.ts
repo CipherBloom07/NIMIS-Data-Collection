@@ -1,3 +1,6 @@
+import catalogue from '../schemas/form-catalogue.v1.json';
+import {loadPhoto} from './storage';
+import {collectorAuthorizationHeaders} from './institutional-auth';
 /** Isolated LOCAL/FICTIONAL bridge for the main NIMIS Core stage form intake.
  * Only an explicit saved draft can be queued. No legacy baseline operations,
  * photos, or real user identities are read or transmitted.
@@ -20,7 +23,6 @@ export type StageQueueItem = {
 };
 const DB='nimis_requirements_drafts_v1',QUEUE='queue',VERSION=2;
 const BASE='http://127.0.0.1:8775/api/v1/stage/forms';
-const ACTOR='00000000-0000-4000-8000-000000000004';
 const DEVICE_KEY='nimis_draft_pilot_device_v1';
 function assertDev(){if(!import.meta.env.DEV)throw new Error('Development-only sync route is disabled');}
 function openDb():Promise<IDBDatabase>{
@@ -116,6 +118,44 @@ async function putQueue(row:StageQueueItem):Promise<void>{
     tx.onerror=()=>reject(tx.error);
   });}finally{db.close();}
 }
+/**
+ * Transfer each evidence blob before its immutable form JSON. Any failed or
+ * incomplete upload leaves the original operation queued unchanged.
+ */
+async function transferEvidence(payload:Payload):Promise<void>{
+  if(payload.scheme_id===null)return; // New-scheme request awaits registration.
+  const definition=catalogue.forms.find(x=>x.form_id===payload.form_id);
+  if(!definition)throw new Error('Form not in approved development catalogue');
+  const fields=definition.fields.filter(x=>x.type==='photo'||x.type==='attachments');
+  const referenced=new Set<string>();
+  for(const field of fields){
+    const value=payload.answers[field.field_id];
+    if(typeof value==='string'&&value)referenced.add(value);
+    if(Array.isArray(value))for(const id of value)if(typeof id==='string'&&id)referenced.add(id);
+  }
+  for(const id of referenced){
+    const blob=await loadPhoto(id);
+    if(!blob)throw new Error('Local photograph unavailable; retain submission and restore evidence: '+id);
+    if(blob.size>524288)throw new Error('Photo exceeds server evidence limit');
+    const bytes=await blob.arrayBuffer();
+    const hash=await crypto.subtle.digest('SHA-256',bytes);
+    const sha256=Array.from(new Uint8Array(hash)).map(x=>x.toString(16).padStart(2,'0')).join('');
+    const response=await fetch(BASE+'/evidence/'+encodeURIComponent(id)+
+      '?scheme_id='+encodeURIComponent(payload.scheme_id),{
+        method:'PUT',cache:'no-store',headers:{
+          ...collectorAuthorizationHeaders(),
+          'Content-Type':blob.type||'image/jpeg',
+          'X-Content-SHA256':sha256,
+        },body:blob,
+      });
+    if(!response.ok)throw new Error('Photo not acknowledged by NIMIS Core (HTTP '+response.status+')');
+    const ack=await response.json();
+    if(ack.photo_id!==id||ack.sha256!==sha256||
+       !['accepted','duplicate'].includes(ack.outcome)){
+      throw new Error('Invalid photo upload receipt; keep original evidence');
+    }
+  }
+}
 let inFlight=false;
 export async function syncQueuedForms():Promise<{synced:number;remaining:number;attention:number}>{
   assertDev();
@@ -127,9 +167,10 @@ export async function syncQueuedForms():Promise<{synced:number;remaining:number;
     for(const row of queue){
       let response:Response;
       try{
+        await transferEvidence(row.payload);
         response=await fetch(BASE+'/sync/push',{
           method:'POST',cache:'no-store',
-          headers:{'X-Nimis-Dev-Actor':ACTOR,'Content-Type':'application/json'},
+          headers:{...collectorAuthorizationHeaders(),'Content-Type':'application/json'},
           body:JSON.stringify({operations:[row.payload]}),
         });
       }catch{
@@ -151,4 +192,50 @@ export async function syncQueuedForms():Promise<{synced:number;remaining:number;
     return {synced,remaining:current.filter(x=>x.status==='pending').length,
       attention:current.filter(x=>x.status==='attention').length};
   }finally{inFlight=false;}
+}
+
+/** Read server decisions for already acknowledged revisions, not guesses.
+ * A returned/revision-conflicted form stays on-device for correction.
+ */
+export async function refreshFormReviewStatuses():
+  Promise<{checked:number;updated:number;attention:number}> {
+  assertDev();
+  const acknowledged=(await listFormQueue())
+    .filter(item=>item.status==='synced'||(item.status==='attention'&&Boolean(item.server_status)))
+    .slice(-50);
+  let updated=0,checked=0,attention=0;
+  for(const row of acknowledged){
+    let result:Response;
+    try{
+      result=await fetch(BASE+'/sync/status/'+encodeURIComponent(row.payload.event_id),{
+        cache:'no-store',headers:collectorAuthorizationHeaders(),
+      });
+    }catch{break;}
+    if(result.status===401||result.status===403)break;
+    if(!result.ok)continue;
+    const body=await result.json().catch(()=>null);
+    if(!body||body.source!=='ISOLATED_DEVELOPMENT'||body.official!==false||
+       body.event_id!==row.payload.event_id||body.record_id!==row.record_id||
+       body.revision!==row.revision)continue;
+    checked++;
+    const state=String(body.status??'');
+    const accepted=new Set(['AWAITING_FORM_APPROVAL','EVIDENCE_PENDING',
+      'DISTRICT_VERIFIED','PROVINCIAL_REVIEWED','TECHNICAL_APPROVED','PUBLISHED',
+      'RETURNED','SCHEME_REVISION_CONFLICT']);
+    if(!accepted.has(state))continue;
+    const corrective=state==='RETURNED'||state==='SCHEME_REVISION_CONFLICT';
+    const reason=state==='RETURNED'?
+      (Array.isArray(body.decisions)?body.decisions:
+        []).filter((x:{action?:string;reason?:string})=>x.action==='RETURN')
+          .map((x:{reason?:string})=>x.reason??'').filter(Boolean).slice(-1)[0]??'Officer returned the submission':
+      state==='SCHEME_REVISION_CONFLICT'?'Scheme registry changed; request a new assignment revision':
+      state==='EVIDENCE_PENDING'?'Photo evidence is incomplete on the server':undefined;
+    const next:StageQueueItem={...row,server_status:state,
+      status:corrective?'attention':'synced',reason};
+    if(row.server_status!==next.server_status||row.status!==next.status||row.reason!==next.reason){
+      await putQueue(next);updated++;
+    }
+    if(corrective)attention++;
+  }
+  return {checked,updated,attention};
 }
