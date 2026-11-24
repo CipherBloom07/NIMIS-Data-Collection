@@ -56,12 +56,14 @@ async function stableEventId(surveyId: string, revision: number): Promise<string
 
 /** Prepares one explicitly finalized survey revision; no automatic upload. */
 export async function prepareSubmission(
-  event: OutboxEvent, identity: AssignedCollectorIdentity,
+  event: OutboxEvent, identity: AssignedCollectorIdentity, localSequence: number,
 ): Promise<PreparedSubmission> {
   assertUuid(event.surveyId, 'surveyId');
   assertUuid(identity.userId, 'userId');
   assertUuid(identity.deviceId, 'deviceId');
   if (!identity.schemeId.trim()) throw new Error('Assigned canonical scheme ID required');
+  // A local sequence must be monotonic across the entire device, not per survey.
+  if (!Number.isSafeInteger(localSequence) || localSequence < 1) throw new Error('Device-wide sequence required');
   if (!Number.isSafeInteger(event.revision) || event.revision < 1) throw new Error('Invalid local revision');
   if (!event.formId || !Number.isSafeInteger(event.formVersion) || (event.formVersion ?? 0) < 1) {
     throw new Error('Approved form identity and version required');
@@ -76,7 +78,7 @@ export async function prepareSubmission(
     scheme_id: identity.schemeId,
     form_id: event.formId,
     form_version: event.formVersion!,
-    local_sequence: event.revision,
+    local_sequence: localSequence,
     captured_at: event.createdAt,
     action: 'submit',
     data: structuredClone(event.answers),
