@@ -15,6 +15,9 @@ import DemoIntegrationPanel from './DemoIntegrationPanel';
 import CoreStageSyncLab from './CoreStageSyncLab';
 import RequirementsForms from './RequirementsForms';
 import BrandLogo from './BrandLogo';
+import QuarterlySurvey from './QuarterlySurvey';
+import './collector-mobile.css';
+import {Home,Layers,UserRound} from 'lucide-react';
 import { quickStorageRisk, type StorageRisk } from './storage-health';
 import './storage-panel.css';
 import './workflow.css';
@@ -36,6 +39,7 @@ export default function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [menuOpen, setMenuOpen] = useState(false);
   const [referenceView, setReferenceView] = useState(false);
+  const [quarterlyView,setQuarterlyView]=useState(false);
   const [dataTestView, setDataTestView] = useState(false);
   const [helpView, setHelpView] = useState(false);
   const [storageView, setStorageView] = useState(false);
@@ -74,6 +78,7 @@ export default function App() {
     setCoreStageView(false);
     setRequirementsView(false);
     setReferenceView(false);
+    setQuarterlyView(false);
     sessionRef.current += 1;
     draftIdRef.current = draft?.id ?? null;
     setActiveId(draft?.id ?? null);
@@ -114,7 +119,7 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [answers, activeId]);
 
-  async function leaveForm(destination: 'dashboard' | 'schemes' | 'test' | 'help' | 'storage' | 'integration' | 'core-stage' | 'requirements') {
+  async function leaveForm(destination: 'dashboard' | 'schemes' | 'test' | 'help' | 'storage' | 'integration' | 'core-stage' | 'requirements' | 'quarterly') {
     if (busy) return;
     setBusy(true);
     try {
@@ -133,6 +138,7 @@ export default function App() {
       setIntegrationView(destination === 'integration');
       setCoreStageView(destination === 'core-stage');
       setRequirementsView(destination === 'requirements');
+      setQuarterlyView(destination === 'quarterly');
       setMenuOpen(false);
       await refresh();
       if (activeId !== undefined && Object.keys(answers).length > 0) {
@@ -303,6 +309,7 @@ export default function App() {
       {import.meta.env.DEV && <button className={'nav-button ' + (integrationView ? 'selected' : '')} onClick={() => void leaveForm('integration')}><ClipboardList size={19}/> Collector–District test</button>}
       {import.meta.env.DEV && <button className={'nav-button ' + (coreStageView ? 'selected' : '')} onClick={() => void leaveForm('core-stage')}><Database size={19}/> PostgreSQL Offline Sync (Test)</button>}
       {import.meta.env.DEV && <button className={'nav-button ' + (requirementsView ? 'selected' : '')} onClick={() => void leaveForm('requirements')}><ClipboardList size={19}/> Requirements Forms (Draft)</button>}
+      <button className="nav-button" onClick={()=>void leaveForm('quarterly')}><ClipboardList size={19}/> Quarterly questionnaire</button>
       <div className="aside-spacer"/>
       <div className="side-status"><CloudOff size={18}/><span>Local-only development build<br/><small>Server sync not connected</small></span></div>
     </aside>
@@ -316,7 +323,7 @@ export default function App() {
       <div className="content">
         {notice && <div role="status" className="notice"><span>{notice}</span><button aria-label="Dismiss" onClick={() => setNotice('')}><X size={16}/></button></div>}
         {(storageRisk === 'warning' || storageRisk === 'critical') && <div className={'storage-risk storage-risk-' + storageRisk} role="alert"><AlertTriangle size={22}/><div><strong>{storageRisk === 'critical' ? 'Storage critically low' : 'Storage getting low'}</strong><p>New photos or surveys might fail to save. Preserve local records and check available space.</p></div><button type="button" className="secondary" onClick={() => void leaveForm('storage')}>Check storage</button></div>}
-        {!editing ? (requirementsView ? <RequirementsForms/> : coreStageView ? <CoreStageSyncLab/> : integrationView ? <DemoIntegrationPanel/> : storageView ? <StoragePanel/> : helpView ? <HelpPanel/> : dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel onStartSurvey={() => void startNewSurvey()}/> : <>
+        {!editing ? (quarterlyView ? <QuarterlySurvey/> : requirementsView ? <RequirementsForms/> : coreStageView ? <CoreStageSyncLab/> : integrationView ? <DemoIntegrationPanel/> : storageView ? <StoragePanel/> : helpView ? <HelpPanel/> : dataTestView ? <DataTestPanel/> : referenceView ? <ReferencePanel onStartSurvey={() => void startNewSurvey()}/> : <>
           <div className="heading-row"><div><div className="overline">NIMIS / FIELD OPERATIONS</div><h1>Survey dashboard</h1><p>Capture reliable irrigation scheme information across Zimbabwe.</p></div>
           <button className="primary" onClick={() => begin()}><FilePlus2 size={18}/> New survey</button></div>
           <WorkflowHome drafts={drafts} onStart={() => void startNewSurvey()} onSchemes={() => void leaveForm('schemes')} onResume={begin}/>
@@ -363,6 +370,13 @@ export default function App() {
         </>}
         <footer className="footer">NIMIS Field Collection · Development build · Not connected to the official scheme registry</footer>
       </div>
+      <nav className="collector-bottom" aria-label="Collector mobile navigation">
+        <button onClick={()=>void leaveForm('dashboard')}><Home size={21}/>Home</button>
+        <button onClick={()=>void leaveForm('quarterly')}><FilePlus2 size={21}/>Capture</button>
+        <button onClick={()=>void leaveForm('requirements')}><Layers size={21}/>Queue</button>
+        <button onClick={()=>void leaveForm('requirements')}><ClipboardList size={21}/>Submissions</button>
+        <button onClick={()=>void leaveForm('help')}><UserRound size={21}/>Help</button>
+      </nav>
     </main>
   </div>;
 }
