@@ -184,3 +184,37 @@ def secure_push(body: PushBatch, actor: UUID = Depends(_actor)):
         # are safe to replay with their original event IDs.
         raise HTTPException(503, detail="Sync database or reference registry unavailable") from None
     return {"server_time": datetime.now(timezone.utc).isoformat(), "results": results}
+
+
+@router.get("/district/inbox")
+def secure_district_inbox(actor: UUID = Depends(_actor)):
+    """Read-only preview of submitted records under the district officer's
+    authoritative scheme assignments. No approval actions are enabled.
+    """
+    _, _, _, url = _config()
+    try:
+        import psycopg
+        with psycopg.connect(url, connect_timeout=5) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT DISTINCT o.event_id, o.record_id, o.scheme_id, o.form_id,
+                              o.form_version, o.captured_at, o.received_at
+                       FROM nimis_sync.operation o
+                       WHERE EXISTS (
+                         SELECT 1 FROM nimis_sync.current_actor_scope s
+                         WHERE s.user_id=%s AND s.scheme_id=o.scheme_id
+                           AND s.role='district_officer' AND s.active=true
+                       )
+                       ORDER BY o.received_at DESC, o.event_id DESC LIMIT 100""",
+                    (actor,),
+                )
+                rows = cur.fetchall()
+    except Exception:
+        raise HTTPException(503, detail="District review registry unavailable") from None
+    # Metadata-only until official field-level privacy and review policy is approved.
+    return {"source": "NIMIS_STAGING_SYNC", "items": [
+        {"event_id": str(row[0]), "record_id": str(row[1]),
+         "scheme_id": row[2], "form_id": row[3], "form_version": row[4],
+         "captured_at": row[5].isoformat(), "received_at": row[6].isoformat()}
+        for row in rows
+    ]}
