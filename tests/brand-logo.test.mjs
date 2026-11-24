@@ -23,7 +23,7 @@ test('desktop and mobile headers use a resilient shared logo', () => {
 
 test('service worker upgrades the branding cache and keeps the logo fallback offline', () => {
   const sw = readFileSync('public/sw.js', 'utf8');
-  assert.match(sw, /nimis-field-shell-v5/);
+  assert.match(sw, /nimis-field-shell-v6-security/);
   assert.match(sw, /'\/nimis-logo\.png'/);
   assert.match(sw, /'\/zimbabwe-coat-of-arms\.svg'/);
 });

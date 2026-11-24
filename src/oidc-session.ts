@@ -3,7 +3,7 @@
  * Access tokens only exist in module memory; the temporary PKCE verifier and
  * random state are removed immediately after callback or on expiry.
  */
-import {bindInstitutionalAccessToken} from './institutional-auth';
+import {bindInstitutionalAccessToken,institutionalAccessTokenIsActive} from './institutional-auth';
 
 const TEMP_KEY='nimis_oidc_pkce_pending_v1';
 type Provider={issuer:string;authorization_endpoint:string;token_endpoint:string};
@@ -56,11 +56,12 @@ function redirectUri():string{
   return String(import.meta.env.VITE_NIMIS_OIDC_REDIRECT_URI??location.origin+location.pathname);
 }
 export function institutionalSessionIsActive():boolean{
-  return Boolean(signedInUntil>Date.now());
+  return Boolean(signedInUntil>Date.now()&&institutionalAccessTokenIsActive());
 }
 export function signOutInstitutionalSession():void{
   bindInstitutionalAccessToken(null);
   signedInUntil=0;
+  sessionStorage.removeItem(TEMP_KEY);
 }
 export async function startInstitutionalSignIn():Promise<void>{
   const provider=await metadata();
@@ -115,7 +116,7 @@ export async function completeInstitutionalSignIn():Promise<boolean>{
      !Number.isFinite(value.expires_in)||value.expires_in<30){
     throw new Error('Identity provider did not issue a valid short-lived bearer token');
   }
-  bindInstitutionalAccessToken(value.access_token);
+  bindInstitutionalAccessToken(value.access_token,value.expires_in);
   signedInUntil=Date.now()+(Number(value.expires_in)-15)*1000;
   return true;
 }

@@ -37,6 +37,6 @@ test('contract covers reference, form, sync, attachment and verification APIs', 
 
 test('service worker excludes authenticated API routes from cache', () => {
   const sw = readFileSync('public/sw.js', 'utf8');
-  assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/);
+  assert.match(sw, /PUBLIC_ASSETS\.includes\(url\.pathname\)/);
   assert.match(sw, /Authorization/);
 });
