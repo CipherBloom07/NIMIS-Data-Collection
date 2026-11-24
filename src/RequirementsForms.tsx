@@ -8,11 +8,13 @@ import catalogue from '../schemas/form-catalogue.v1.json';
 import {loadAssignedCoreSchemes,type CoreAssignedScheme} from './core-stage-sync';
 import {savePhoto} from './storage';
 import {validateRequirementsDraft} from './requirements-validation';
+import {queueSavedForm,listFormQueue,syncQueuedForms,type StageQueueItem} from './form-stage-sync';
 
 type FormField={field_id:string;type:string;units:string|null;metadata:string[]};
 type FormDefinition={form_id:string;form_version:number;name:string;frequency:string;fields:FormField[]};
 type LocalRecord={
   id:string;form_id:string;form_version:number;scheme_id:string;
+  base_scheme_revision:number|null;
   period_code:string;observed_at:string;source:string;
   answers:Record<string,unknown>;updated_at:string;revision:number;
   status:'DRAFT_UNAPPROVED';
@@ -21,8 +23,11 @@ const forms=catalogue.forms as FormDefinition[];
 const DB='nimis_requirements_drafts_v1',STORE='records';
 function openDb():Promise<IDBDatabase>{
   return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(DB,1);
-    req.onupgradeneeded=()=>req.result.createObjectStore(STORE,{keyPath:'id'});
+    const req=indexedDB.open(DB,2);
+    req.onupgradeneeded=()=>{
+      if(!req.result.objectStoreNames.contains(STORE))req.result.createObjectStore(STORE,{keyPath:'id'});
+      if(!req.result.objectStoreNames.contains('queue'))req.result.createObjectStore('queue',{keyPath:'id'});
+    };
     req.onsuccess=()=>resolve(req.result);
     req.onerror=()=>reject(req.error);
   });
@@ -91,6 +96,7 @@ function Field({field,value,onChange}:{field:FormField;value:unknown;onChange:(v
 }
 export default function RequirementsForms(){
   const [records,setRecords]=useState<LocalRecord[]>([]);
+  const [queue,setQueue]=useState<StageQueueItem[]>([]);
   const [schemes,setSchemes]=useState<CoreAssignedScheme[]>([]);
   const [formId,setFormId]=useState(forms[0].form_id);
   const [schemeId,setSchemeId]=useState('');
@@ -104,7 +110,17 @@ export default function RequirementsForms(){
   const [busy,setBusy]=useState(false);
   const form=forms.find(x=>x.form_id===formId)!;
   const issues=validateRequirementsDraft(formId,answers,observed,source);
-  useEffect(()=>{void listRecords().then(setRecords).catch(error=>setNotice('Local storage: '+String(error)))},[]);
+  useEffect(()=>{
+    void listRecords().then(setRecords).catch(error=>setNotice('Local storage: '+String(error)));
+    void listFormQueue().then(setQueue).catch(error=>setNotice('Pilot queue: '+String(error)));
+  },[]);
+  useEffect(()=>{
+    const retry=()=>{void syncQueuedForms().then(()=>{
+      void listFormQueue().then(setQueue);
+    }).catch(()=>{})};
+    window.addEventListener('online',retry);
+    return()=>window.removeEventListener('online',retry);
+  },[]);
   useEffect(()=>{void loadAssignedCoreSchemes().then(list=>{
     setSchemes(list);setSchemeId(list[0]?.scheme_id??'');
   }).catch(error=>setNotice('Main NIMIS Core scheme assignments unavailable: '+String(error)))},[]);
@@ -122,7 +138,9 @@ export default function RequirementsForms(){
     setBusy(true);
     try{
       const id=recordId??crypto.randomUUID();
-      const item:LocalRecord={id,scheme_id:schemeId,form_id:form.form_id,
+      const item:LocalRecord={id,scheme_id:form.form_id==='new_scheme_request'?'':schemeId,
+        base_scheme_revision:form.form_id==='new_scheme_request'?null:
+          (schemes.find(s=>s.scheme_id===schemeId)?.revision??null),form_id:form.form_id,
         form_version:form.form_version,period_code:period,observed_at:observed,
         source,answers:structuredClone(answers),updated_at:today(),revision:revision+1,
         status:'DRAFT_UNAPPROVED'};
@@ -131,6 +149,29 @@ export default function RequirementsForms(){
       setRecords(await listRecords());
       setNotice('Offline draft saved with '+issues.length+' data-quality issue(s). NOT synchronized — Department-approved server validation is required.');
     }catch(error){setNotice('Saving failed. Keep this screen open: '+String(error))}
+    finally{setBusy(false)}
+  }
+  async function enqueue(){
+    const saved=records.find(row=>row.id===recordId&&row.revision===revision);
+    if(!saved){setNotice('Save the current form revision first.');return;}
+    const check=validateRequirementsDraft(saved.form_id,saved.answers,saved.observed_at,saved.source);
+    if(check.length){setNotice('Resolve '+check.length+' data quality issue(s) before test queueing.');return;}
+    setBusy(true);
+    try{
+      const item=await queueSavedForm(saved,saved.base_scheme_revision);
+      setQueue(await listFormQueue());
+      setNotice('Saved revision queued for ISOLATED fictional NIMIS Core. Event '+item.payload.event_id+' retained until acknowledged.');
+    }catch(error){setNotice('Not queued: '+String(error))}
+    finally{setBusy(false)}
+  }
+  async function upload(){
+    setBusy(true);
+    try{
+      const result=await syncQueuedForms();
+      setQueue(await listFormQueue());
+      setNotice('Development sync: '+result.synced+' acknowledged, '+result.remaining+
+        ' pending, '+result.attention+' require review. Photo files are NOT transferred.');
+    }catch(error){setNotice('Sync unavailable; operations preserved: '+String(error))}
     finally{setBusy(false)}
   }
   if(!import.meta.env.DEV)return <p>Unapproved collection forms are disabled outside development.</p>;
@@ -162,8 +203,13 @@ export default function RequirementsForms(){
     </div>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'16px 0'}}>
       <button className="primary" disabled={busy||(!schemeId&&form.form_id!=='new_scheme_request')} onClick={()=>void save()}><Save size={18}/> Save offline draft</button>
+      <button className="secondary" disabled={busy||issues.length>0||!recordId} onClick={()=>void enqueue()}>Queue saved revision (fictional test)</button>
+      <button className="secondary" disabled={busy||!queue.some(x=>x.status==='pending')} onClick={()=>void upload()}>Sync test queue to NIMIS Core</button>
       <span>Revision {revision} · No automatic upload or approval</span>
     </div>
+    <p role="status"><strong>Development queue:</strong> {queue.filter(x=>x.status==='pending').length} pending,
+      {' '}{queue.filter(x=>x.status==='synced').length} acknowledged,
+      {' '}{queue.filter(x=>x.status==='attention').length} need attention. Only metadata and form answers are staged; photographs stay on this device.</p>
     <h3><ClipboardList size={18}/> Saved local forms</h3>
     {records.length===0?<p>No drafts in the proposed form catalogue.</p>:
       <div className="record-list">{records.slice().reverse().map(row=><button key={row.id} className="record"
