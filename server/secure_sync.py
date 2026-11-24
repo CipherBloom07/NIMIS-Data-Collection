@@ -168,6 +168,12 @@ def _accept_one(url: str, actor: UUID, operation: Operation) -> dict:
             )
             inserted = cur.fetchone()
             if inserted:
+                # Submission and its review state are committed together.
+                cur.execute(
+                    """INSERT INTO nimis_sync.review_state(event_id,status)
+                       VALUES (%s,'SUBMITTED')""",
+                    (operation.event_id,),
+                )
                 return {**result, "outcome": "accepted", "received_at": inserted[0].isoformat()}
             cur.execute(
                 """SELECT event_id,content_sha256 FROM nimis_sync.operation
@@ -214,9 +220,10 @@ def secure_district_inbox(actor: UUID = Depends(_actor)):
         with psycopg.connect(url, connect_timeout=5) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """SELECT DISTINCT o.event_id, o.record_id, o.scheme_id, o.form_id,
-                              o.form_version, o.captured_at, o.received_at
+                    """SELECT o.event_id, o.record_id, o.scheme_id, o.form_id,
+                              o.form_version, o.captured_at, o.received_at, rs.status
                        FROM nimis_sync.operation o
+                       JOIN nimis_sync.review_state rs ON rs.event_id=o.event_id
                        WHERE EXISTS (
                          SELECT 1 FROM nimis_sync.current_actor_scope s
                          WHERE s.user_id=%s AND s.scheme_id=o.scheme_id
@@ -232,6 +239,7 @@ def secure_district_inbox(actor: UUID = Depends(_actor)):
     return {"source": "NIMIS_STAGING_SYNC", "items": [
         {"event_id": str(row[0]), "record_id": str(row[1]),
          "scheme_id": row[2], "form_id": row[3], "form_version": row[4],
-         "captured_at": row[5].isoformat(), "received_at": row[6].isoformat()}
+         "captured_at": row[5].isoformat(), "received_at": row[6].isoformat(),
+         "status": row[7]}
         for row in rows
     ]}
