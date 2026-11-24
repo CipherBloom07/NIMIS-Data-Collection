@@ -8,9 +8,9 @@
   "theme_color": "#0a4e63",
   "icons": [
     {
-      "src": "/zimbabwe-coat-of-arms.jpg",
-      "sizes": "180x158",
-      "type": "image/jpeg",
+      "src": "/nimis-logo.png",
+      "sizes": "1152x768",
+      "type": "image/png",
       "purpose": "any"
     },
     {
